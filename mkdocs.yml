@@ -1,0 +1,96 @@
+site_name: Wisdome 360
+site_description: Making work for the Wisdome Malmö dome with open tools — a one-week module for EDT 26 and TEI 26, Malmö University.
+site_author: David Cuartielles
+site_url: https://dcuartielles.github.io/wisdome-360/
+repo_url: https://github.com/dcuartielles/wisdome-360
+repo_name: dcuartielles/wisdome-360
+edit_uri: edit/main/docs/
+copyright: >-
+  Text and media we made: <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a> ·
+  Code: <a href="https://www.gnu.org/licenses/gpl-3.0.html">GPL-3.0</a> ·
+  Imported material keeps its own licence — see <a href="credits/">Credits</a>
+
+theme:
+  name: material
+  language: en
+  font:
+    text: Atkinson Hyperlegible
+    code: JetBrains Mono
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - navigation.indexes
+    - search.suggest
+    - search.highlight
+    - content.tabs.link
+    - content.code.copy
+    - content.action.edit
+  icon:
+    repo: fontawesome/brands/github
+
+extra_css:
+  - stylesheets/extra.css
+
+plugins:
+  - search
+  - mkdocs-jupyter:
+      execute: false
+      include_source: true
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.keys
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+
+nav:
+  - Start here:
+      - index.md
+      - The week: week.md
+  - Set up:
+      - setup/index.md
+      - Setup wizard: setup/wizard.html
+      - Dome Simulator: tools/dome-simulator.html
+  - Workflows:
+      - workflows/index.md
+      - Track A — a film: workflows/track-a.md
+      - Track B — live: workflows/track-b.md
+  - Examples:
+      - examples/index.md
+  - Problems: problems.md
+  - Reference:
+      - reference/index.md
+      - The venue: reference/venue.md
+      - Where to put things: reference/comfortable-zone.md
+  - Delivery: delivery.md
+  - About:
+      - What changed: changes.md
+      - Credits and licences: credits.md

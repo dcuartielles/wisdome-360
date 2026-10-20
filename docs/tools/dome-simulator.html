@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dome Simulator</title>
+<!--
+  Dome Simulator — option 3 of tools/virtual-displays
+  Preview a dome master (square, equidistant fisheye) as it will look inside
+  Wisdome Malmö: an 11.6 m dome tilted 26°, raised at the back.
+
+  One file, no libraries, no network. Works from a double-click (file://) in
+  Chrome, Edge and Firefox; if your browser refuses screen sharing from a file,
+  use the start-simulator script next to this file, which serves it on localhost.
+
+  Inputs: a file (image / video), a shared screen / window / tab, or a camera
+  device — which is how a USB HDMI capture card shows up, so a student laptop
+  can treat the simulator as a real external display.
+
+  Conventions (shared with every example in outputs/06-examples):
+    room:  +Y up, -Z = front of the room, +X = the audience's right
+    image: bottom edge of the dome master = front, image right = audience right
+    guides: elevation 0 = eye level; comfortable zone = in front, 15–60° up, ±60°
+-->
+<style>
+  :root { --bg:#06090f; --fg:#f2f5fa; --dim:#8fa3be; --ac:#ff7e4d; --panel:#101725ee;
+          --line:#24314a; --ok:#5af08c; --warn:#ffd84d; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--fg);
+              font-family:system-ui,-apple-system,"Segoe UI",sans-serif; overflow:hidden; }
+  canvas { display:block; width:100vw; height:100vh; touch-action:none; cursor:grab; }
+  canvas.drag { cursor:grabbing; }
+  #ui { position:fixed; left:0; top:0; bottom:0; width:min(350px,94vw); padding:14px 14px 70px;
+        overflow-y:auto; z-index:10; scrollbar-width:thin; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px;
+          padding:12px 14px; margin-bottom:10px; backdrop-filter:blur(6px); }
+  h1 { font-size:15px; margin:0 0 2px; letter-spacing:.14em; text-transform:uppercase; color:var(--ac); }
+  details > summary { cursor:pointer; font-size:12px; letter-spacing:.12em; text-transform:uppercase;
+          color:var(--fg); font-weight:700; list-style:none; }
+  details > summary::before { content:'▸ '; color:var(--ac); }
+  details[open] > summary::before { content:'▾ '; }
+  p, .note { font-size:12.5px; line-height:1.5; color:var(--dim); margin:6px 0 0; }
+  button, label.btn, select {
+      display:block; width:100%; margin-top:8px; padding:9px 11px; border-radius:8px; cursor:pointer;
+      background:#1a2434; color:var(--fg); border:1px solid var(--line); font-size:13px; text-align:center; font-family:inherit; }
+  select { text-align:left; }
+  button:hover, label.btn:hover { border-color:#3a4c6c; }
+  button.primary { background:var(--ac); color:#16202e; border-color:var(--ac); font-weight:700; }
+  button.on { border-color:var(--ac); color:var(--ac); }
+  button:disabled { opacity:.4; cursor:default; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:0 8px; }
+  .four { display:grid; grid-template-columns:repeat(4,1fr); gap:0 6px; }
+  .four button { padding:7px 4px; font-size:12px; }
+  input[type=file] { display:none; }
+  .row { display:flex; gap:8px; align-items:center; margin-top:9px; font-size:12.5px; color:var(--dim); }
+  .row > span:first-child { width:86px; flex:none; }
+  .row input[type=range] { flex:1; min-width:0; accent-color:var(--ac); }
+  .row input[type=checkbox] { accent-color:var(--ac); width:16px; height:16px; margin:0; }
+  .row output { width:52px; text-align:right; font-variant-numeric:tabular-nums; color:var(--fg); }
+  #msg { font-size:12px; color:var(--ac); margin-top:8px; min-height:1em; }
+  #toggle { position:fixed; right:14px; top:14px; width:auto; margin:0; padding:8px 12px; z-index:11; }
+  #hud { position:fixed; left:50%; transform:translateX(-50%); bottom:12px; z-index:9; pointer-events:none;
+         font-size:12px; color:var(--dim); background:#0a0f18cc; border:1px solid var(--line);
+         border-radius:8px; padding:6px 12px; max-width:min(760px,94vw); text-align:center; }
+  #hud b { color:var(--fg); font-weight:600; }
+  #hud .w { color:var(--warn); }
+  #legend { display:flex; gap:12px; flex-wrap:wrap; margin-top:8px; font-size:11.5px; color:var(--dim); }
+  #legend i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
+  kbd { font:11px ui-monospace,monospace; background:#1a2434; border:1px solid var(--line); border-radius:4px; padding:1px 5px; color:var(--fg); }
+  table.keys { font-size:12px; color:var(--dim); border-collapse:collapse; margin-top:6px; }
+  table.keys td { padding:2px 8px 2px 0; vertical-align:top; }
+  .hidden { display:none !important; }
+  #drop { position:fixed; inset:0; z-index:20; display:flex; align-items:center; justify-content:center;
+          background:#06090fcc; border:3px dashed var(--ac); font-size:20px; color:var(--ac); pointer-events:none; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<button id="toggle" title="H">hide panel</button>
+<div id="drop" class="hidden">Drop a dome master image or video</div>
+
+<div id="ui">
+  <div class="card">
+    <h1>Dome Simulator</h1>
+    <p>See a <b>dome master</b> as the audience will see it inside Wisdome Malmö — 11.6&nbsp;m, tilted 26°, raised at the back. Drag to look around, scroll to zoom.</p>
+  </div>
+
+  <div class="card">
+    <details open><summary>Source</summary>
+      <button id="share" class="primary">Share a screen, window or tab…</button>
+      <div class="two">
+        <button id="ndigo" title="Receive NDI through the bridge in tools/virtual-displays/2-ndi-receiver">NDI…</button>
+        <select id="ndisrc" disabled><option value="">NDI: no bridge</option></select>
+      </div>
+      <div class="two">
+        <label class="btn" for="pick">Open file…</label>
+        <button id="demo">Test card</button>
+      </div>
+      <input id="pick" type="file" accept="image/*,video/*">
+      <select id="cam"><option value="">Camera / capture card…</option></select>
+      <div class="two">
+        <select id="camres" title="Resolution to ask the device for">
+          <option value="1080">1920 × 1080</option>
+          <option value="2160">3840 × 2160</option>
+          <option value="2048">2048 × 2048</option>
+        </select>
+        <button id="camgo">Start device</button>
+      </div>
+      <button id="stop" disabled>Stop source</button>
+      <div id="vctl" class="hidden">
+        <div class="row"><span>Position</span><input id="seek" type="range" min="0" max="1000" value="0"><output id="seekv">0:00</output></div>
+        <div class="two"><button id="play">Pause</button><button id="sound">Sound off</button></div>
+      </div>
+      <div id="msg"></div>
+    </details>
+  </div>
+
+  <div class="card">
+    <details open><summary>Crop the source</summary>
+      <p>The simulator uses a centred square of the source. Shrink or shift it if the fisheye circle isn't centred — e.g. a shared window with a title bar, or a 16:9 capture.</p>
+      <div class="row"><span>Size</span><input id="cropSize" type="range" min="20" max="100" step="0.1"><output id="cropSizev"></output></div>
+      <div class="row"><span>Shift X</span><input id="cropX" type="range" min="-50" max="50" step="0.1"><output id="cropXv"></output></div>
+      <div class="row"><span>Shift Y</span><input id="cropY" type="range" min="-50" max="50" step="0.1"><output id="cropYv"></output></div>
+      <div class="row"><span>Fisheye FOV</span><input id="fov" type="range" min="150" max="220" step="1"><output id="fovv"></output></div>
+      <div class="row"><input id="mirror" type="checkbox"><label for="mirror">Mirror left / right</label></div>
+      <button id="cropReset">Reset crop</button>
+    </details>
+  </div>
+
+  <div class="card">
+    <details open><summary>Venue</summary>
+      <div class="row"><span>Dome tilt</span><input id="tilt" type="range" min="0" max="30" step="1"><output id="tiltv"></output></div>
+      <div class="row"><span>Front edge</span><input id="front" type="range" min="0" max="359" step="1"><output id="frontv"></output></div>
+      <div class="four"><button data-front="0">bottom</button><button data-front="90">right</button><button data-front="180">top</button><button data-front="270">left</button></div>
+      <p>Which edge of the dome master lands at the front of the room. Our examples assume <b>bottom</b>; confirm it with the venue and change it here if they disagree.</p>
+    </details>
+  </div>
+
+  <div class="card">
+    <details open><summary>Seat</summary>
+      <select id="seat">
+        <option value="ref">Reference — dome centre</option>
+        <option value="front">Front row, centre</option>
+        <option value="mid">Middle rows, centre</option>
+        <option value="back">Back row, centre</option>
+        <option value="side">Back row, far left</option>
+        <option value="custom">Custom</option>
+      </select>
+      <div class="row"><span>Left / right</span><input id="ex" type="range" min="-4" max="4" step="0.05"><output id="exv"></output></div>
+      <div class="row"><span>Height</span><input id="ey" type="range" min="-2" max="2.5" step="0.05"><output id="eyv"></output></div>
+      <div class="row"><span>Front / back</span><input id="ez" type="range" min="-4" max="4" step="0.05"><output id="ezv"></output></div>
+      <p>Metres from the dome's centre. Seat positions are approximate until we have the venue's seating plan; the <b>reference</b> seat is the one every guide in the course is measured from.</p>
+    </details>
+  </div>
+
+  <div class="card">
+    <details open><summary>View</summary>
+      <select id="view">
+        <option value="inset">Dome + fisheye inset</option>
+        <option value="dome">Dome only</option>
+        <option value="fisheye">Fisheye (dome master) only</option>
+      </select>
+      <div class="row"><span>Lens</span><input id="camFov" type="range" min="40" max="140" step="1"><output id="camFovv"></output></div>
+      <div class="row"><input id="guide" type="checkbox"><label for="guide">Comfortable zone, sweet spot, elevation rings</label></div>
+      <div class="row"><input id="frontMark" type="checkbox"><label for="frontMark">Front marker</label></div>
+      <div class="row"><input id="rim" type="checkbox"><label for="rim">Dome rim line</label></div>
+      <div class="row"><input id="haze" type="checkbox"><label for="haze">Simulate cross-reflection (approx.)</label></div>
+      <div id="legend">
+        <span><i style="background:var(--ok)"></i>comfortable zone</span>
+        <span><i style="background:var(--warn)"></i>sweet spot</span>
+        <span><i style="background:#7390ff"></i>15° rings</span>
+        <span><i style="background:var(--ac)"></i>front</span>
+      </div>
+      <div class="two">
+        <button id="look">Look at sweet spot</button>
+        <button id="full">Fullscreen</button>
+      </div>
+      <div class="two">
+        <button id="shot">Save view PNG</button>
+        <button id="defaults">Reset all</button>
+      </div>
+    </details>
+  </div>
+
+  <div class="card">
+    <details><summary>Keys &amp; notes</summary>
+      <table class="keys">
+        <tr><td><kbd>drag</kbd> <kbd>arrows</kbd></td><td>look around</td></tr>
+        <tr><td><kbd>scroll</kbd> <kbd>+</kbd> <kbd>−</kbd></td><td>lens (zoom)</td></tr>
+        <tr><td><kbd>V</kbd></td><td>cycle view</td></tr>
+        <tr><td><kbd>G</kbd> <kbd>F</kbd></td><td>guides · front marker</td></tr>
+        <tr><td><kbd>1</kbd>–<kbd>5</kbd></td><td>seats</td></tr>
+        <tr><td><kbd>L</kbd></td><td>look at the sweet spot</td></tr>
+        <tr><td><kbd>Space</kbd></td><td>play / pause a video file</td></tr>
+        <tr><td><kbd>H</kbd> <kbd>Enter</kbd></td><td>hide panel · fullscreen</td></tr>
+        <tr><td><kbd>P</kbd></td><td>save a PNG of the view</td></tr>
+      </table>
+      <p>What this can show: framing, the tilt, what ends up behind or overhead, how fast things move across the dome, how bright fields wash out. What it cannot: the size, the brightness, the 5.1 sound, 58 people in the dark.</p>
+    </details>
+  </div>
+</div>
+
+<div id="hud">No source — share a window, open a file or load the test card.</div>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const D2R = Math.PI / 180;
+const DOME_R = 5.8;                       // 11.6 m dome
+
+/* ------------------------------------------------------------------ settings */
+const DEF = { tilt:26, front:0, mirror:false, fov:180, cropSize:100, cropX:0, cropY:0,
+              seat:'ref', ex:0, ey:0, ez:0, view:'inset', camFov:90,
+              guide:true, frontMark:true, rim:true, haze:false, camres:'1080' };
+const SEATS = {                           // metres from the dome centre, approximate
+  ref:   [ 0.0,  0.0,  0.0],
+  front: [ 0.0, -0.9, -2.6],
+  mid:   [ 0.0,  0.2,  0.6],
+  back:  [ 0.0,  1.1,  3.0],
+  side:  [-2.6,  1.0,  2.4] };
+const SEAT_KEYS = ['ref','front','mid','back','side'];
+const KEY = 'dome-simulator-v1';
+let S = { ...DEF };
+try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
+let saveT = 0;
+function save(){ clearTimeout(saveT); saveT = setTimeout(() => {
+  try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }, 300); }
+
+const fmt = {
+  tilt: v => v + '°', fov: v => v + '°', camFov: v => v + '°',
+  cropSize: v => (+v).toFixed(0) + '%', cropX: v => (+v).toFixed(1), cropY: v => (+v).toFixed(1),
+  ex: v => (+v).toFixed(2), ey: v => (+v).toFixed(2), ez: v => (+v).toFixed(2),
+  front: v => { const n = {0:'bottom',90:'right',180:'top',270:'left'}[v]; return n || v + '°'; } };
+const ranges = ['tilt','front','fov','cropSize','cropX','cropY','ex','ey','ez','camFov'];
+const checks = ['mirror','guide','frontMark','rim','haze'];
+const selects = ['seat','view','camres'];
+
+function syncUI(){
+  for (const k of ranges) { $(k).value = S[k]; $(k + 'v').textContent = fmt[k](S[k]); }
+  for (const k of checks) $(k).checked = !!S[k];
+  for (const k of selects) $(k).value = S[k];
+  document.querySelectorAll('[data-front]').forEach(b => b.classList.toggle('on', +b.dataset.front === +S.front));
+}
+for (const k of ranges) $(k).addEventListener('input', e => {
+  S[k] = +e.target.value; $(k + 'v').textContent = fmt[k](S[k]);
+  if (k === 'ex' || k === 'ey' || k === 'ez') { S.seat = 'custom'; $('seat').value = 'custom'; clampEye(); }
+  if (k === 'front') syncUI();
+  if (k === 'tilt' && src && src.testcard) loadTestCard();
+  save(); });
+for (const k of checks) $(k).addEventListener('change', e => { S[k] = e.target.checked; save(); });
+$('view').addEventListener('change', e => { S.view = e.target.value; save(); });
+$('camres').addEventListener('change', e => { S.camres = e.target.value; save(); });
+$('seat').addEventListener('change', e => setSeat(e.target.value));
+document.querySelectorAll('[data-front]').forEach(b => b.addEventListener('click', () => {
+  S.front = +b.dataset.front; syncUI(); save(); }));
+$('cropReset').addEventListener('click', () => { S.cropSize = 100; S.cropX = 0; S.cropY = 0; S.mirror = false; S.fov = 180; syncUI(); save(); });
+$('defaults').addEventListener('click', () => { const r = S.camres; S = { ...DEF, camres:r }; syncUI(); save(); lookSweet(); });
+
+function setSeat(k){
+  S.seat = k;
+  if (SEATS[k]) [S.ex, S.ey, S.ez] = SEATS[k];
+  syncUI(); save();
+}
+function clampEye(){
+  const m = Math.hypot(S.ex, S.ey, S.ez), lim = DOME_R - 0.4;
+  if (m > lim) { S.ex *= lim/m; S.ey *= lim/m; S.ez *= lim/m; syncUI(); }
+}
+
+/* ------------------------------------------------------------------ WebGL */
+const canvas = $('c');
+const gl = canvas.getContext('webgl2', { antialias:false, alpha:false, preserveDrawingBuffer:false });
+if (!gl) {
+  document.body.innerHTML = '<p style="padding:30px;font:16px system-ui;color:#f2f5fa">This browser has no WebGL 2. Use a current Chrome, Edge, Firefox or Safari.</p>';
+  throw new Error('no webgl2');
+}
+
+const VS = `#version 300 es
+void main(){ vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2));
+             gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); }`;
+
+const FS = `#version 300 es
+precision highp float;
+uniform vec4  uView;       // viewport x, y, w, h (device px)
+uniform int   uMode;       // 0 = inside the dome, 1 = flat dome master
+uniform vec3  uEye;        // eye, metres from the dome centre (room frame)
+uniform mat3  uCam;        // camera -> room
+uniform float uTanHalf;    // tan(vertical lens fov / 2)
+uniform float uTilt;       // radians, zenith leans towards the front (-Z)
+uniform float uRot;        // radians, which image edge is the front
+uniform float uHalfFov;    // radians, half the fisheye field of view
+uniform float uMirror;
+uniform vec4  uCrop;       // texture-space crop: offset.xy, size.zw (top-down)
+uniform sampler2D uTex;
+uniform float uHasTex, uGuide, uFrontMark, uRim, uHaze;
+uniform float uR;
+out vec4 o;
+const float PI = 3.14159265359;
+
+// room <-> dome. The dome is the room rotated about X by the tilt.
+vec3 roomToDome(vec3 q){ float c = cos(uTilt), s = sin(uTilt);
+  return vec3(q.x, q.y*c - q.z*s, q.y*s + q.z*c); }
+vec3 domeToRoom(vec3 d){ float c = cos(uTilt), s = sin(uTilt);
+  return vec3(d.x, d.y*c + d.z*s, -d.y*s + d.z*c); }
+
+vec2 cropUV(vec2 uv){
+  if (uMirror > 0.5) uv.x = 1.0 - uv.x;
+  return uCrop.xy + uv * uCrop.zw; }
+
+// dome direction (y = dome zenith) -> colour from the dome master
+vec3 master(vec3 d){
+  float th = acos(clamp(d.y, -1.0, 1.0));      // angle from the dome zenith
+  float A  = atan(d.x, -d.z) + uRot;            // 0 = front edge of the image
+  float r  = th / uHalfFov;                     // equidistant: linear in angle
+  if (r > 1.0 || uHasTex < 0.5) return vec3(0.0);
+  vec2 uv = vec2(0.5 + 0.5*r*sin(A), 0.5 + 0.5*r*cos(A));   // bottom = front
+  return texture(uTex, cropUV(uv)).rgb;
+}
+
+// the course's guides, in the audience's angles (q = direction in the room)
+vec3 guides(vec3 col, vec3 q, float px){
+  float e  = degrees(asin(clamp(q.y, -1.0, 1.0)));
+  float az = degrees(atan(q.x, -q.z));
+  float aaz = abs(az);
+  float w = px;                                   // line half-width in degrees
+  if (uGuide > 0.5) {
+    float g = 0.0;
+    for (int i = 0; i < 6; i++) { float t = float(i) * 15.0;
+      g = max(g, 1.0 - smoothstep(0.0, w, abs(e - t))); }
+    col = mix(col, vec3(0.45, 0.56, 1.0), g * 0.45);
+    float zone = step(15.0, e) * step(e, 60.0) * step(aaz, 60.0);
+    col = mix(col, col + vec3(0.05, 0.10, 0.06), zone);
+    float edge = max(
+      max(1.0 - smoothstep(0.0, w*1.4, abs(e - 15.0)), 1.0 - smoothstep(0.0, w*1.4, abs(e - 60.0))) * step(aaz, 60.0),
+      (1.0 - smoothstep(0.0, w*1.4, abs(aaz - 60.0) * cos(radians(e)))) * step(15.0, e) * step(e, 60.0));
+    col = mix(col, vec3(0.35, 0.95, 0.55), edge * 0.9);
+    vec3 sweet = vec3(0.0, sin(radians(40.0)), -cos(radians(40.0)));
+    float a = degrees(acos(clamp(dot(q, sweet), -1.0, 1.0)));
+    col = mix(col, vec3(1.0, 0.85, 0.30), 1.0 - smoothstep(0.0, w*1.6, abs(a - 12.0)));
+    col = mix(col, vec3(1.0, 0.85, 0.30), 1.0 - smoothstep(w*2.0, w*3.0, a));
+  }
+  if (uFrontMark > 0.5) {
+    float m = (1.0 - smoothstep(0.0, w*3.0, aaz)) * (1.0 - smoothstep(-20.0, 8.0, e));
+    col = mix(col, vec3(1.0, 0.49, 0.30), m);
+  }
+  return col;
+}
+
+void main(){
+  vec2 f = gl_FragCoord.xy - uView.xy;
+  vec3 col;
+  if (uMode == 0) {
+    // ---- inside the dome: cast a ray from the eye to the dome surface
+    vec2 ndc = f / uView.zw * 2.0 - 1.0;
+    float aspect = uView.z / uView.w;
+    vec3 rd = normalize(uCam * vec3(ndc.x * uTanHalf * aspect, ndc.y * uTanHalf, -1.0));
+    float b = dot(uEye, rd), c = dot(uEye, uEye) - uR*uR;
+    float s = -b + sqrt(max(b*b - c, 0.0));
+    vec3 P  = uEye + s * rd;
+    vec3 dl = roomToDome(P / uR);
+    float px = degrees(2.0 * uTanHalf / uView.w) * 1.2;      // ~1 pixel in degrees
+    if (dl.y >= 0.0) {
+      col = master(dl);
+      if (uHaze > 0.5 && uHasTex > 0.5) {
+        // a dome lights itself: every point also receives a share of the whole picture
+        vec3 avg = textureLod(uTex, uCrop.xy + uCrop.zw*0.5, 14.0).rgb / 0.785;
+        col += 0.22 * avg;
+      }
+    } else {
+      // below the dome's rim: walls, seats, people
+      col = vec3(0.028, 0.036, 0.05) * (0.7 + 0.3 * smoothstep(-0.6, 0.0, dl.y));
+    }
+    if (uRim > 0.5) col = mix(col, vec3(0.22, 0.30, 0.44), 1.0 - smoothstep(0.0, radians(px) * 1.5, abs(dl.y)));
+    col = guides(col, rd, px);
+  } else {
+    // ---- the dome master itself, as a flat square, guides measured from the dome centre
+    float side = min(uView.z, uView.w);
+    vec2 p = (f - uView.zw * 0.5) / (side * 0.5);       // -1..1, y up
+    float r = length(p);
+    if (abs(p.x) > 1.0 || abs(p.y) > 1.0) { o = vec4(0.024, 0.035, 0.059, 1.0); return; }
+    vec2 uv = vec2(0.5 + 0.5*p.x, 0.5 - 0.5*p.y);       // top-down image coordinates
+    col = uHasTex > 0.5 ? texture(uTex, cropUV(uv)).rgb : vec3(0.0);
+    if (r > 1.0) col *= 0.25;                             // outside the circle: never projected
+    else {
+      float th = r * uHalfFov, Ad = atan(p.x, -p.y) - uRot;
+      vec3 dl = vec3(sin(th)*sin(Ad), cos(th), -sin(th)*cos(Ad));
+      if (dl.y < 0.0) col *= 0.35;                        // beyond the rim (fisheye wider than 180°)
+      float pxd = degrees(uHalfFov) / (side * 0.5) * 1.2;
+      col = guides(col, domeToRoom(dl), pxd);
+      if (uRim > 0.5) col = mix(col, vec3(0.22, 0.30, 0.44), 1.0 - smoothstep(0.0, 1.5/(side*0.5), abs(r - min(1.0, 0.5*PI/uHalfFov))));
+    }
+  }
+  o = vec4(col, 1.0);
+}`;
+
+function sh(type, srcText){
+  const s = gl.createShader(type); gl.shaderSource(s, srcText); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+  return s; }
+const prog = gl.createProgram();
+gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS));
+gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
+gl.linkProgram(prog);
+if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+gl.useProgram(prog);
+const U = {};
+for (const n of ['uView','uMode','uEye','uCam','uTanHalf','uTilt','uRot','uHalfFov','uMirror','uCrop',
+                 'uTex','uHasTex','uGuide','uFrontMark','uRim','uHaze','uR'])
+  U[n] = gl.getUniformLocation(prog, n);
+gl.bindVertexArray(gl.createVertexArray());
+
+const tex = gl.createTexture();
+gl.bindTexture(gl.TEXTURE_2D, tex);
+gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0,0,0,255]));
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+gl.uniform1i(U.uTex, 0);
+
+function upload(el){
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+  try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, el); }
+  catch (e) { say('Could not read that source: ' + e.message); return false; }
+  gl.generateMipmap(gl.TEXTURE_2D);
+  return true;
+}
+
+/* ------------------------------------------------------------------ sources */
+let src = null;          // { el, kind:'video'|'still', name, stream, url, file, testcard, w, h }
+let dirty = false, frames = 0, srcFps = 0, lastFpsT = performance.now();
+const msg = $('msg');
+const say = t => { msg.textContent = t || ''; };
+
+function stopSource(){
+  if (!src) return;
+  if (src.kind === 'ndi') ndiSend({ type:'select', name:null });
+  if (src.stream) src.stream.getTracks().forEach(t => t.stop());
+  if (src.kind === 'video') { src.el.pause(); src.el.srcObject = null; src.el.removeAttribute('src'); src.el.load?.(); }
+  if (src.url) URL.revokeObjectURL(src.url);
+  src = null; srcFps = 0;
+  $('stop').disabled = true; $('vctl').classList.add('hidden');
+}
+
+function watchFrames(v){
+  if (!('requestVideoFrameCallback' in HTMLVideoElement.prototype)) return;
+  const tick = () => { if (!src || src.el !== v) return; dirty = true; frames++; v.requestVideoFrameCallback(tick); };
+  v.requestVideoFrameCallback(tick);
+}
+
+function useVideo(v, name, opts = {}){
+  stopSource();
+  src = { el:v, kind:'video', name, ...opts };
+  v.muted = true; v.playsInline = true; v.loop = !!opts.file;
+  watchFrames(v);
+  v.play().catch(() => say('Click anywhere once to start playback.'));
+  $('stop').disabled = false;
+  $('vctl').classList.toggle('hidden', !opts.file);
+  $('sound').textContent = 'Sound off'; $('play').textContent = 'Pause';
+}
+
+function useStill(el, name, opts = {}){
+  stopSource();
+  src = { el, kind:'still', name, ...opts };
+  src.w = el.naturalWidth || el.width; src.h = el.naturalHeight || el.height;
+  upload(el);
+  $('stop').disabled = false;
+}
+
+function openFile(f){
+  if (!f) return;
+  const url = URL.createObjectURL(f);
+  if (f.type.startsWith('video')) {
+    const v = document.createElement('video'); v.src = url;
+    useVideo(v, f.name, { file:true, url });
+    say('');
+  } else if (f.type.startsWith('image')) {
+    const img = new Image();
+    img.onload = () => { useStill(img, f.name, { url }); say(''); };
+    img.onerror = () => say('Could not open ' + f.name);
+    img.src = url;
+  } else say('That is not an image or a video.');
+}
+$('pick').addEventListener('change', e => { openFile(e.target.files[0]); e.target.value = ''; });
+
+/* drag & drop */
+let dragN = 0;
+addEventListener('dragenter', e => { e.preventDefault(); dragN++; $('drop').classList.remove('hidden'); });
+addEventListener('dragleave', () => { if (--dragN <= 0) { dragN = 0; $('drop').classList.add('hidden'); } });
+addEventListener('dragover', e => e.preventDefault());
+addEventListener('drop', e => { e.preventDefault(); dragN = 0; $('drop').classList.add('hidden');
+  openFile(e.dataTransfer.files[0]); });
+
+/* screen / window / tab */
+$('share').addEventListener('click', async () => {
+  if (!navigator.mediaDevices?.getDisplayMedia) {
+    say('This browser cannot share the screen from here. Run the start-simulator script next to this file and open the page it prints (http://localhost:8361/…).');
+    return; }
+  const video = { frameRate:{ ideal:30 }, width:{ max:4096 }, height:{ max:4096 } };   // native size, never upscaled
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getDisplayMedia({ video, audio:true,
+      selfBrowserSurface:'exclude', surfaceSwitching:'include', systemAudio:'include' });
+  } catch (e) {
+    if (e.name === 'NotAllowedError') { say('Sharing cancelled.'); return; }
+    try { stream = await navigator.mediaDevices.getDisplayMedia({ video }); }
+    catch (e2) { say('Could not share: ' + e2.message); return; }
+  }
+  const tr = stream.getVideoTracks()[0];
+  const label = tr.label || 'shared screen';
+  const v = document.createElement('video'); v.srcObject = stream;
+  useVideo(v, label, { stream });
+  tr.addEventListener('ended', () => { if (src && src.stream === stream) { stopSource(); say('Sharing ended.'); } });
+  say(stream.getAudioTracks().length ? 'Sharing with sound — press "Sound" in Source to hear it.' : '');
+  if (stream.getAudioTracks().length) $('vctl').classList.remove('hidden');
+});
+
+/* camera / capture card */
+async function listCams(){
+  if (!navigator.mediaDevices?.enumerateDevices) return;
+  const keep = $('cam').value;
+  const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+  $('cam').innerHTML = '<option value="">Camera / capture card…</option>' +
+    devs.map((d, i) => `<option value="${d.deviceId}">${(d.label || 'Video device ' + (i+1)).replace(/</g,'&lt;')}</option>`).join('');
+  if ([...$('cam').options].some(o => o.value === keep)) $('cam').value = keep;
+}
+navigator.mediaDevices?.addEventListener?.('devicechange', listCams);
+listCams().catch(() => {});
+$('camgo').addEventListener('click', async () => {
+  if (!navigator.mediaDevices?.getUserMedia) { say('No camera access here — try the start-simulator script.'); return; }
+  const [w, h] = { '1080':[1920,1080], '2160':[3840,2160], '2048':[2048,2048] }[S.camres];
+  const id = $('cam').value;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio:false, video:{
+      deviceId: id ? { exact:id } : undefined, width:{ ideal:w }, height:{ ideal:h }, frameRate:{ ideal:30 } } });
+    const tr = stream.getVideoTracks()[0];
+    const v = document.createElement('video'); v.srcObject = stream;
+    useVideo(v, tr.label || 'camera', { stream });
+    tr.addEventListener('ended', () => { if (src && src.stream === stream) { stopSource(); say('Device disconnected.'); } });
+    say('');
+    listCams().then(() => { const s = tr.getSettings(); if (s.deviceId) $('cam').value = s.deviceId; });
+  } catch (e) { say('Could not open the device: ' + e.message); }
+});
+
+/* NDI, through the bridge in tools/virtual-displays/2-ndi-receiver (browsers can't receive NDI) */
+const NDI_PORTS = [8370,8371,8372,8373,8374,8375,8376,8377,8378,8379];
+let ndiWs = null, ndiConnecting = false, ndiInfo = null;
+function ndiSend(m){ if (ndiWs && ndiWs.readyState === 1) ndiWs.send(JSON.stringify(m)); }
+function tryPort(port){
+  return new Promise(res => {
+    let ws;
+    try { ws = new WebSocket(`ws://127.0.0.1:${port}`); } catch (e) { res(null); return; }
+    const t = setTimeout(() => { try { ws.close(); } catch (e) {} res(null); }, 1200);
+    ws.onopen = () => { clearTimeout(t); res(ws); };
+    ws.onerror = () => { clearTimeout(t); res(null); };
+  });
+}
+async function ndiConnect(quiet){
+  if (ndiWs && ndiWs.readyState === 1) return true;
+  if (ndiConnecting) return false;
+  ndiConnecting = true;
+  let ws = null;
+  for (const p of NDI_PORTS) { ws = await tryPort(p); if (ws) break; }
+  ndiConnecting = false;
+  if (!ws) {
+    if (!quiet) say('No NDI bridge found. Start it with start-ndi-bridge in tools/virtual-displays/2-ndi-receiver, then press NDI again.');
+    return false;
+  }
+  ndiWs = ws; ws.binaryType = 'arraybuffer';
+  ws.onmessage = e => typeof e.data === 'string' ? ndiStatus(JSON.parse(e.data)) : ndiFrame(e.data);
+  ws.onclose = () => {
+    ndiWs = null; $('ndisrc').disabled = true;
+    $('ndisrc').innerHTML = '<option value="">NDI: no bridge</option>';
+    if (src && src.kind === 'ndi') { src = null; $('stop').disabled = true; say('The NDI bridge stopped.'); }
+  };
+  $('ndisrc').disabled = false;
+  if (!quiet) say('Connected to the NDI bridge. Pick a source in the list next to NDI.');
+  return true;
+}
+function ndiStatus(m){
+  if (m.type !== 'sources') return;
+  const sel = $('ndisrc'), keep = (src && src.kind === 'ndi') ? src.name : sel.value;
+  const names = m.names.slice();
+  if (m.current && !names.includes(m.current)) names.push(m.current);
+  sel.innerHTML = `<option value="">${names.length ? 'NDI source…' : 'NDI: no senders found'}</option>` +
+    names.map(n => `<option>${n.replace(/</g,'&lt;')}</option>`).join('');
+  if (names.includes(keep)) sel.value = keep;
+}
+function ndiStart(name){
+  stopSource();
+  src = { kind:'ndi', name, el:null };
+  ndiInfo = null;
+  $('stop').disabled = false;
+  ndiSend({ type:'select', name });
+  ndiSend({ type:'ack' });
+  say('Waiting for NDI frames from ' + name + '…');
+}
+function ndiFrame(buf){
+  const L = new DataView(buf).getUint32(0);
+  const head = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 4, L)));
+  if (!src || src.kind !== 'ndi') return;                // switched away: stop the flow (no ack)
+  createImageBitmap(new Blob([new Uint8Array(buf, 4 + L)], { type:'image/jpeg' }))
+    .then(bmp => {
+      if (src && src.kind === 'ndi') {
+        if (upload(bmp)) { src.w = bmp.width; src.h = bmp.height; frames++; }
+        head.lat = Date.now() / 1000 - head.ts;           // sender -> screen (needs synced clocks)
+        ndiInfo = head;
+        if (msg.textContent.startsWith('Waiting for NDI')) say('');
+        ndiSend({ type:'ack' });
+      }
+      bmp.close();
+    }).catch(() => ndiSend({ type:'ack' }));
+}
+$('ndigo').addEventListener('click', async () => {
+  if (!(await ndiConnect(false))) return;
+  const name = $('ndisrc').value;
+  if (name) ndiStart(name);
+  else { ndiSend({ type:'list' }); $('ndisrc').focus(); }
+});
+$('ndisrc').addEventListener('change', e => { if (e.target.value) ndiStart(e.target.value); });
+ndiConnect(true);                                          // quietly look for a running bridge
+
+$('stop').addEventListener('click', () => { stopSource(); say(''); });
+$('play').addEventListener('click', togglePlay);
+function togglePlay(){
+  if (!src || src.kind !== 'video' || !src.file) return;
+  if (src.el.paused) { src.el.play(); $('play').textContent = 'Pause'; }
+  else { src.el.pause(); $('play').textContent = 'Play'; }
+}
+$('sound').addEventListener('click', () => {
+  if (!src || src.kind !== 'video') return;
+  src.el.muted = !src.el.muted;
+  $('sound').textContent = src.el.muted ? 'Sound off' : 'Sound on';
+  $('sound').classList.toggle('on', !src.el.muted);
+});
+let seeking = false;
+$('seek').addEventListener('input', e => { if (src?.file && src.el.duration) {
+  seeking = true; src.el.currentTime = e.target.value / 1000 * src.el.duration; } });
+$('seek').addEventListener('change', () => seeking = false);
+const mmss = t => Math.floor(t/60) + ':' + String(Math.floor(t%60)).padStart(2,'0');
+
+/* built-in test card: the course grid, drawn in the dome's angles, zone in the room's */
+function loadTestCard(){
+  const N = 2048, c = document.createElement('canvas'); c.width = c.height = N;
+  const x = c.getContext('2d'), C = N/2, t = S.tilt * D2R;
+  x.fillStyle = '#06090f'; x.fillRect(0,0,N,N);
+  x.save(); x.beginPath(); x.arc(C,C,C,0,7); x.clip();
+  const g = x.createRadialGradient(C,C*1.5,0,C,C,C);
+  g.addColorStop(0,'#1c2a44'); g.addColorStop(1,'#0a101c'); x.fillStyle = g; x.fillRect(0,0,N,N);
+  const toXY = (az, el) => {                    // room angles -> image pixel (bottom = front)
+    const X = Math.cos(el*D2R)*Math.sin(az*D2R), Y = Math.cos(el*D2R)*Math.cos(az*D2R), Z = Math.sin(el*D2R);
+    const ly = Y*Math.cos(t) - Z*Math.sin(t), lz = Y*Math.sin(t) + Z*Math.cos(t);
+    const r = Math.acos(Math.max(-1, Math.min(1, lz))) / (Math.PI/2), a = Math.atan2(X, ly);
+    return [C + Math.sin(a)*r*C, C + Math.cos(a)*r*C];
+  };
+  const path = pts => { x.beginPath(); pts.forEach(([az,el],i) => { const [px,py] = toXY(az,el); i ? x.lineTo(px,py) : x.moveTo(px,py); }); };
+  x.lineWidth = 3; x.strokeStyle = '#3a4a66';
+  for (let e = 0; e < 90; e += 15) { x.beginPath(); x.arc(C,C,C*(1-e/90),0,7); x.stroke(); }
+  x.strokeStyle = '#2b3850';
+  for (let a = 0; a < 360; a += 15) { const r = a*D2R; x.beginPath(); x.moveTo(C,C); x.lineTo(C+Math.sin(r)*C, C+Math.cos(r)*C); x.stroke(); }
+  const zone = [];
+  for (let a=-60;a<=60;a+=2) zone.push([a,15]);
+  for (let e=15;e<=60;e+=2) zone.push([60,e]);
+  for (let a=60;a>=-60;a-=2) zone.push([a,60]);
+  for (let e=60;e>=15;e-=2) zone.push([-60,e]);
+  path(zone); x.closePath(); x.fillStyle = 'rgba(90,240,140,.14)'; x.fill();
+  x.strokeStyle = '#5af08c'; x.lineWidth = 5; x.stroke();
+  // checkerboard patch at the sweet spot, to judge sharpness and distortion
+  for (let i=-4;i<4;i++) for (let j=-3;j<3;j++) if ((i+j)&1) {
+    path([[i*3,40+j*3],[i*3+3,40+j*3],[i*3+3,43+j*3],[i*3,43+j*3]]); x.closePath();
+    x.fillStyle = '#e8edf5'; x.fill(); }
+  x.fillStyle = '#ff7e4d'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.font = `bold ${N*0.036}px system-ui`;
+  const lab = [[0,8,'FRONT'],[90,8,'RIGHT'],[180,40,'BACK'],[-90,8,'LEFT']];
+  for (const [az,el,s] of lab) { const [px,py] = toXY(az,el); x.fillText(s, px, py); }
+  x.fillStyle = '#8fa3be'; x.font = `bold ${N*0.026}px system-ui`;
+  for (let e = 15; e <= 60; e += 15) { const [px,py] = toXY(-75, e); x.fillText(e+'°', px, py); }
+  x.fillStyle = '#5af08c'; x.font = `bold ${N*0.024}px system-ui`;
+  { const [px,py] = toXY(0, 55); x.fillText('COMFORTABLE ZONE', px, py); }
+  x.fillStyle = '#ffd84d';
+  { const [px,py] = toXY(0, 31); x.fillText('SWEET SPOT', px, py); }
+  x.fillStyle = '#4b5d7e'; x.font = `bold ${N*0.02}px system-ui`; x.fillText('ZENITH OF THE DOME', C, C);
+  x.restore();
+  useStill(c, `test card (tilt ${S.tilt}°)`, { testcard:true });
+}
+$('demo').addEventListener('click', () => { loadTestCard(); say(''); });
+
+/* ------------------------------------------------------------------ camera */
+let yaw = 0, pitch = 40 * D2R, wantShot = false;
+function lookSweet(){ yaw = 0; pitch = 40 * D2R; }
+let drag = null;
+canvas.addEventListener('pointerdown', e => { drag = { x:e.clientX, y:e.clientY }; canvas.setPointerCapture(e.pointerId); canvas.classList.add('drag');
+  if (src?.kind === 'video' && src.el.paused && !src.file) src.el.play(); });
+canvas.addEventListener('pointerup', () => { drag = null; canvas.classList.remove('drag'); });
+canvas.addEventListener('pointermove', e => { if (!drag) return;
+  const k = (S.camFov * D2R) / innerHeight;          // one screen height = one lens fov
+  yaw   += (e.clientX - drag.x) * k;
+  pitch += (e.clientY - drag.y) * k;
+  pitch = Math.max(-30*D2R, Math.min(100*D2R, pitch));
+  drag = { x:e.clientX, y:e.clientY }; });
+canvas.addEventListener('wheel', e => { e.preventDefault(); zoom(e.deltaY > 0 ? 3 : -3); }, { passive:false });
+function zoom(d){ S.camFov = Math.max(40, Math.min(140, S.camFov + d)); syncUI(); save(); }
+
+const keys = new Set();
+addEventListener('keydown', e => {
+  const tag = e.target.tagName, k = e.key;
+  if (tag === 'SELECT' || (tag === 'INPUT' && e.target.type !== 'checkbox' && e.target.type !== 'range')) return;
+  if (tag === 'INPUT' && e.target.type === 'range' && k.startsWith('Arrow')) return;   // let the slider have them
+  if (k.startsWith('Arrow')) { keys.add(k); e.preventDefault(); return; }
+  if (k === 'h' || k === 'H') toggleUI();
+  else if (k === 'g' || k === 'G') { S.guide = !S.guide; syncUI(); save(); }
+  else if (k === 'f' || k === 'F') { S.frontMark = !S.frontMark; syncUI(); save(); }
+  else if (k === 'v' || k === 'V') { const o = ['inset','dome','fisheye']; S.view = o[(o.indexOf(S.view)+1)%3]; syncUI(); save(); }
+  else if (k === 'l' || k === 'L') lookSweet();
+  else if (k === 'p' || k === 'P') wantShot = true;
+  else if (k === 'Enter') fullscreen();
+  else if (k === ' ') { e.preventDefault(); togglePlay(); }
+  else if (k === '+' || k === '=') zoom(-5);
+  else if (k === '-') zoom(5);
+  else if (k >= '1' && k <= '5') setSeat(SEAT_KEYS[+k - 1]);
+});
+addEventListener('keyup', e => keys.delete(e.key));
+
+function toggleUI(){ const ui = $('ui'); ui.classList.toggle('hidden');
+  $('toggle').textContent = ui.classList.contains('hidden') ? 'show panel' : 'hide panel'; }
+$('toggle').addEventListener('click', toggleUI);
+function fullscreen(){ if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.(); }
+$('full').addEventListener('click', fullscreen);
+$('look').addEventListener('click', lookSweet);
+$('shot').addEventListener('click', () => wantShot = true);
+
+/* ------------------------------------------------------------------ render */
+function resize(){
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  const w = Math.round(innerWidth * dpr), h = Math.round(innerHeight * dpr);
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+}
+
+function camMatrix(){
+  const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
+  // Ry(yaw) * Rx(pitch), column-major; yaw > 0 turns left, pitch > 0 looks up
+  return new Float32Array([ cy, 0, -sy,   sy*sp, cp, cy*sp,   sy*cp, -sp, cy*cp ]);
+}
+
+function cropRect(){
+  if (!src || !src.w) return [0, 0, 1, 1];
+  const w = src.w, h = src.h, m = Math.min(w, h), side = m * S.cropSize / 100;
+  const cx = w/2 + S.cropX/100 * m, cy = h/2 + S.cropY/100 * m;
+  return [ (cx - side/2)/w, (cy - side/2)/h, side/w, side/h ];
+}
+
+function pass(mode, x, y, w, h){
+  gl.viewport(x, y, w, h);
+  gl.uniform4f(U.uView, x, y, w, h);
+  gl.uniform1i(U.uMode, mode);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+
+let lastT = performance.now(), hudT = 0;
+function frame(now){
+  const dt = Math.min(0.1, (now - lastT) / 1000); lastT = now;
+  resize();
+  // arrow keys
+  const sp = 50 * D2R * dt;
+  if (keys.has('ArrowLeft'))  yaw += sp;
+  if (keys.has('ArrowRight')) yaw -= sp;
+  if (keys.has('ArrowUp'))    pitch = Math.min(100*D2R, pitch + sp);
+  if (keys.has('ArrowDown'))  pitch = Math.max(-30*D2R, pitch - sp);
+
+  // new video frame?
+  if (src && src.kind === 'video' && src.el.readyState >= 2) {
+    const hasRVFC = 'requestVideoFrameCallback' in HTMLVideoElement.prototype;
+    if (dirty || !hasRVFC) { if (upload(src.el)) { src.w = src.el.videoWidth; src.h = src.el.videoHeight; } dirty = false; if (!hasRVFC) frames++; }
+    if (src.file && !seeking && src.el.duration) { $('seek').value = src.el.currentTime / src.el.duration * 1000; $('seekv').textContent = mmss(src.el.currentTime); }
+  }
+  if (now - lastFpsT > 1000) { srcFps = frames * 1000 / (now - lastFpsT); frames = 0; lastFpsT = now; }
+
+  const has = !!(src && src.w);
+  gl.uniform3f(U.uEye, S.ex, S.ey, S.ez);
+  gl.uniformMatrix3fv(U.uCam, false, camMatrix());
+  gl.uniform1f(U.uTanHalf, Math.tan(S.camFov * D2R / 2));
+  gl.uniform1f(U.uTilt, S.tilt * D2R);
+  gl.uniform1f(U.uRot, S.front * D2R);
+  gl.uniform1f(U.uHalfFov, S.fov * D2R / 2);
+  gl.uniform1f(U.uMirror, S.mirror ? 1 : 0);
+  gl.uniform4fv(U.uCrop, cropRect());
+  gl.uniform1f(U.uHasTex, has ? 1 : 0);
+  gl.uniform1f(U.uGuide, S.guide ? 1 : 0);
+  gl.uniform1f(U.uFrontMark, S.frontMark ? 1 : 0);
+  gl.uniform1f(U.uRim, S.rim ? 1 : 0);
+  gl.uniform1f(U.uHaze, S.haze ? 1 : 0);
+  gl.uniform1f(U.uR, DOME_R);
+
+  const W = canvas.width, H = canvas.height;
+  gl.disable(gl.SCISSOR_TEST);
+  if (S.view === 'fisheye') {
+    // keep the circle clear of the panel when there is room for both
+    const ui = $('ui'), pw = ui.classList.contains('hidden') || innerWidth < 900 ? 0
+             : Math.round((ui.offsetWidth) * Math.min(devicePixelRatio || 1, 2));
+    gl.clearColor(0.024, 0.035, 0.059, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+    pass(1, pw, 0, W - pw, H);
+  }
+  else {
+    pass(0, 0, 0, W, H);
+    if (S.view === 'inset') {
+      const s = Math.round(Math.min(W, H) * 0.34), m = Math.round(14 * Math.min(devicePixelRatio || 1, 2));
+      const x = W - s - m, y = H - s - m - Math.round(46 * Math.min(devicePixelRatio || 1, 2));
+      gl.enable(gl.SCISSOR_TEST); gl.scissor(x - 2, y - 2, s + 4, s + 4);
+      gl.clearColor(0.14, 0.19, 0.29, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.disable(gl.SCISSOR_TEST);
+      pass(1, x, y, s, s);
+    }
+  }
+  if (wantShot) { wantShot = false; shot(); }
+  if (now - hudT > 500) { hudT = now; hud(); }
+  requestAnimationFrame(frame);
+}
+
+function shot(){
+  canvas.toBlob(b => {
+    if (!b) return;
+    const a = document.createElement('a');
+    const seat = $('seat').selectedOptions[0].textContent.split(',')[0].replace(/[^a-z0-9]+/gi,'-').toLowerCase();
+    a.href = URL.createObjectURL(b); a.download = `dome-view_${seat}_${Date.now()}.png`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }, 'image/png');
+}
+
+function hud(){
+  const h = $('hud');
+  if (!src || !src.w) { h.innerHTML = src ? 'Waiting for the first frame…' : 'No source — share a window, open a file or load the test card.'; return; }
+  const parts = [`<b>${src.name.replace(/</g,'&lt;')}</b>`, `${src.w} × ${src.h}`];
+  if (src.kind === 'video') parts.push(`${srcFps.toFixed(0)} fps`);
+  if (src.kind === 'ndi' && ndiInfo) {
+    parts[0] = `<b>NDI · ${src.name.replace(/</g,'&lt;')}</b>`;
+    if (ndiInfo.src_w !== ndiInfo.w) parts[1] = `${ndiInfo.src_w} × ${ndiInfo.src_h} (shown at ${src.w} × ${src.h})`;
+    parts.push(`${srcFps.toFixed(0)} of ${Math.round(ndiInfo.fps)} fps`, `≈ ${Math.max(0, ndiInfo.lat * 1000).toFixed(0)} ms sender → screen`);
+  }
+  const m = Math.min(src.w, src.h), side = Math.round(m * S.cropSize / 100);
+  if (src.w !== src.h || S.cropSize < 100) parts.push(`using ${side} × ${side}`);
+  const warn = [];
+  if (side < 2048) warn.push(`below 2048² — fine for composition, soft for detail`);
+  if (src.kind === 'video' && srcFps > 0 && srcFps < 24 && !src.el.paused) warn.push('low frame rate');
+  if (src.kind === 'ndi' && ndiInfo && srcFps > 0 && srcFps < ndiInfo.fps * 0.8) warn.push('dropping frames (this computer is the bottleneck — try the bridge with --half)');
+  if (S.seat !== 'ref') warn.unshift(`seat: ${$('seat').selectedOptions[0].textContent} — guides measured from here (press 1 for the reference seat)`);
+  h.innerHTML = parts.join(' · ') + (warn.length ? ' · <span class="w">' + warn.join(' · ') + '</span>' : '');
+}
+
+syncUI();
+requestAnimationFrame(frame);
+if (location.hash === '#test') loadTestCard();
+</script>
+</body>
+</html>

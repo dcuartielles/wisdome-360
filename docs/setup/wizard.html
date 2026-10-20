@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Setup wizard · Wisdome 360</title>
+<meta name="description" content="Answer four questions and get a step-by-step checklist for rehearsing your dome piece on your own laptop.">
+<!-- Wisdome 360 setup wizard. GPL-3.0 (code), CC BY-SA 4.0 (text). No libraries, works offline. -->
+<style>
+/* Layout: one column. Questions first, then a generated checklist grouped in stages. */
+:root{
+  --bg:#f4f6f9;--surface:#ffffff;--ink:#14202e;--muted:#566273;--line:#dbe2ea;
+  --head:#1d3557;--head-ink:#ffffff;--accent:#b8650f;--link:#2b5c8a;--done:#2f7d4f;--done-soft:#e7f3eb;--warn-soft:#fbf1e4;
+  --f-body:"Atkinson Hyperlegible",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0f1621;--surface:#172130;--ink:#e6ebf2;--muted:#97a3b4;--line:#26344a;
+  --head:#142640;--head-ink:#e6ebf2;--accent:#e8a24a;--link:#7fb0de;--done:#5fbf83;--done-soft:#14281d;--warn-soft:#2a2114;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 var(--f-body)}
+a{color:var(--link)}
+header{background:var(--head);color:var(--head-ink)}
+header .in{max-width:820px;margin:0 auto;padding:14px 16px;display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+header a{color:var(--head-ink);text-decoration:none;font-weight:700}
+header nav{display:flex;gap:16px;font-size:14px}
+header nav a{font-weight:400;opacity:.9}
+main{max-width:820px;margin:0 auto;padding:28px 16px 80px;display:flex;flex-direction:column;gap:24px}
+h1{font-size:clamp(26px,4.5vw,34px);line-height:1.15;margin:0;text-wrap:balance}
+.lede{margin:6px 0 0;color:var(--muted);max-width:62ch}
+fieldset{border:1px solid var(--line);background:var(--surface);border-radius:8px;margin:0;padding:14px 16px 16px}
+legend{font-weight:700;padding:0 6px}
+.q-hint{color:var(--muted);font-size:14px;margin:0 0 10px}
+.opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}
+.opt{position:relative}
+.opt input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.opt span{display:flex;flex-direction:column;gap:2px;height:100%;border:1px solid var(--line);border-radius:6px;padding:9px 12px;cursor:pointer;background:var(--bg)}
+.opt small{color:var(--muted);font-size:13px;line-height:1.35}
+.opt input:checked+span{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);background:var(--surface)}
+.opt input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+.actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+button{font:700 15px var(--f-body);border-radius:6px;padding:10px 18px;cursor:pointer;border:1px solid var(--accent);background:var(--accent);color:#fff}
+@media (prefers-color-scheme:dark){button{color:#10161f}}
+button.ghost{background:transparent;color:var(--ink);border-color:var(--line);font-weight:400}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button:disabled{opacity:.45;cursor:not-allowed}
+.need{color:var(--muted);font-size:14px}
+#plan{display:flex;flex-direction:column;gap:22px}
+.summary{display:flex;flex-direction:column;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font:12px var(--f-mono);padding:2px 8px;border-radius:4px;border:1px solid var(--line);color:var(--muted)}
+.meter{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.meter i{display:block;height:100%;width:0;background:var(--done);transition:width .3s}
+.mtxt{font:13px var(--f-mono);font-variant-numeric:tabular-nums}
+.stage h2{font-size:20px;margin:0 0 8px;padding-bottom:6px;border-bottom:2px solid var(--ink);display:flex;gap:10px;align-items:baseline}
+.stage h2 .n{font:13px var(--f-mono);color:var(--accent)}
+.stage ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.step{display:grid;grid-template-columns:24px 1fr;gap:4px 12px;padding:12px 4px;border-bottom:1px solid var(--line)}
+.step.done{background:var(--done-soft)}
+.step.done .st{text-decoration:line-through;text-decoration-color:var(--done);color:var(--muted)}
+.step input[type=checkbox]{width:19px;height:19px;margin:3px 0 0;accent-color:var(--done);cursor:pointer}
+.sb{min-width:0;display:flex;flex-direction:column;gap:6px}
+.st{font-weight:700}
+.sd{color:var(--ink)}
+.sd p{margin:0 0 6px}
+.sd ul,.sd ol{margin:0 0 6px;padding-left:20px;list-style:revert;display:block}
+code,kbd{font:13.5px var(--f-mono);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:0 4px;overflow-wrap:anywhere}
+.go{display:inline-block;font-weight:700;font-size:14px;text-decoration:none;border:1px solid var(--link);border-radius:5px;padding:4px 10px;align-self:flex-start}
+.warn{background:var(--warn-soft);border-left:3px solid var(--accent);padding:8px 12px;border-radius:4px;font-size:15px}
+footer{color:var(--muted);font-size:13px;max-width:820px;margin:0 auto;padding:0 16px 40px}
+@media (prefers-reduced-motion:reduce){.meter i{transition:none}}
+</style>
+</head>
+<body>
+<header><div class="in"><a href="../">Wisdome 360</a><nav><a href="../">Start here</a><a href="../tools/dome-simulator.html">Dome Simulator</a><a href="../problems/">Problems</a></nav></div></header>
+<main>
+  <div>
+    <h1>Set up your rehearsal rig</h1>
+    <p class="lede">Four questions, then a checklist for your setup only. At the end your own work shows up in the Dome Simulator, seen from a seat in the dome. Your answers and ticks stay on this computer.</p>
+  </div>
+  <form id="qs" novalidate></form>
+  <div id="plan" hidden></div>
+</main>
+<footer>Code GPL-3.0, text CC BY-SA 4.0 · <a href="../credits/">Credits and licences</a> · Something wrong? Tell us in the help-desk discussion on Canvas.</footer>
+
+<script>
+(function(){
+  var REL = 'https://github.com/dcuartielles/wisdome-360/releases';
+  var SIM = '../tools/dome-simulator.html';
+
+  var Q = [
+    {id:'track', title:'1 · Which track is your group on?', hint:'Not sure yet? Pick the one you are leaning towards; you can change it later.', type:'one', opts:[
+      {v:'A', t:'Track A — a film', d:'You render a video. It is played from the reel.'},
+      {v:'B', t:'Track B — live', d:'Your laptop runs the piece live in the dome.'}]},
+    {id:'os', title:'2 · Which computer will you use?', type:'one', opts:[
+      {v:'win', t:'Windows'}, {v:'mac', t:'macOS'}, {v:'linux', t:'Linux'}]},
+    {id:'tool', title:'3 · Which tool will you make it with?', hint:'Choose the closest. Each one points you to a worked example.', type:'one', dependsOn:'track', opts:{
+      A:[{v:'blender', t:'Blender', d:'3-D scenes · EX-01'},
+         {v:'python', t:'Python', d:'Generated frames · EX-02'},
+         {v:'p5', t:'p5.js', d:'Browser drawing, saved frames · EX-04'},
+         {v:'footage', t:'Our own video', d:'Green screen or filmed footage · EX-10'},
+         {v:'slides', t:'Slides or photos', d:'Flat pictures in the dome · EX-08'}],
+      B:[{v:'td', t:'TouchDesigner', d:'Sound, sensors, network · EX-05'},
+         {v:'unity', t:'Unity', d:'Game engine, 3-D · EX-06'},
+         {v:'webgl', t:'WebGL / shaders', d:'One HTML file · EX-03'},
+         {v:'p5', t:'p5.js', d:'Live in the browser · EX-04'},
+         {v:'openspace', t:'OpenSpace', d:'Fly through space · EX-07'}]}},
+    {id:'hw', title:'4 · What else do you have?', hint:'Tick everything that applies, or nothing.', type:'many', opts:[
+      {v:'capture', t:'USB HDMI capture card', d:'Test a real second display'},
+      {v:'quest', t:'A Meta Quest 3 from the loan', d:'Look around a preview in VR'},
+      {v:'eth', t:'Two Ethernet ports or adapters', d:'Needed for Track B in the venue'}]}
+  ];
+
+  var S = {a:{}, done:{}};
+  try { var raw = localStorage.getItem('w360-wizard'); if (raw) S = JSON.parse(raw); } catch(e){}
+  if (!S.a) S.a = {}; if (!S.done) S.done = {};
+  function persist(){ try { localStorage.setItem('w360-wizard', JSON.stringify(S)); } catch(e){} }
+
+  var form = document.getElementById('qs'), plan = document.getElementById('plan');
+
+  function optsFor(q){ return q.dependsOn ? (q.opts[S.a[q.dependsOn]] || []) : q.opts; }
+  function renderForm(){
+    var h = '';
+    Q.forEach(function(q){
+      var opts = optsFor(q);
+      h += '<fieldset id="f-'+q.id+'"><legend>'+q.title+'</legend>' + (q.hint ? '<p class="q-hint">'+q.hint+'</p>' : '');
+      if (q.dependsOn && !opts.length){ h += '<p class="q-hint">Choose your track first.</p></fieldset>'; return; }
+      h += '<div class="opts">';
+      opts.forEach(function(o){
+        var id = q.id+'-'+o.v, type = q.type==='many' ? 'checkbox' : 'radio';
+        var on = q.type==='many' ? ((S.a[q.id]||[]).indexOf(o.v) >= 0) : (S.a[q.id]===o.v);
+        h += '<label class="opt" for="'+id+'"><input type="'+type+'" name="'+q.id+'" id="'+id+'" value="'+o.v+'"'+(on?' checked':'')+'><span><b>'+o.t+'</b>'+(o.d?'<small>'+o.d+'</small>':'')+'</span></label>';
+      });
+      h += '</div></fieldset>';
+    });
+    h += '<div class="actions"><button type="submit" id="make">Show my checklist</button><span class="need" id="need"></span></div>';
+    form.innerHTML = h;
+    checkReady();
+  }
+  function ready(){ return S.a.track && S.a.os && S.a.tool && optsFor(Q[2]).some(function(o){return o.v===S.a.tool;}); }
+  function checkReady(){
+    var b = document.getElementById('make'), n = document.getElementById('need');
+    if (!b) return;
+    b.disabled = !ready();
+    n.textContent = ready() ? '' : 'Answer questions 1–3 to continue.';
+  }
+  form.addEventListener('change', function(e){
+    var t = e.target; if (!t.name) return;
+    if (t.type === 'checkbox'){
+      S.a[t.name] = Array.prototype.map.call(form.querySelectorAll('input[name="'+t.name+'"]:checked'), function(i){return i.value;});
+    } else {
+      S.a[t.name] = t.value;
+      if (t.name === 'track'){ if (!optsFor(Q[2]).some(function(o){return o.v===S.a.tool;})) delete S.a.tool; persist(); renderForm(); refreshPlan(); return; }
+    }
+    persist(); checkReady(); refreshPlan();
+  });
+  function refreshPlan(){ if (!S.shown) return; if (ready()) renderPlan(); else plan.hidden = true; }
+  form.addEventListener('submit', function(e){ e.preventDefault(); if (!ready()) return; S.shown = true; persist(); renderPlan(); plan.scrollIntoView({behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'}); });
+
+  /* ---------- the steps ---------- */
+  function has(h){ return (S.a.hw||[]).indexOf(h) >= 0; }
+  function osPick(o){ return o[S.a.os] || o.all || ''; }
+
+  var TOOL = {
+    blender:{name:'Blender', ex:'EX-01 Drift', install:{all:'<p>Download Blender from <a href="https://www.blender.org/download/">blender.org</a> (free). Any recent version works; EX-01 was made with Blender 5.</p>'},
+      setup:'<p>Set up the camera like the venue:</p><ol><li>Render engine <b>Cycles</b> (EEVEE cannot render a fisheye).</li><li>Camera → Lens → Type <b>Panoramic</b>, Panorama Type <b>Fisheye Equidistant</b>, Field of View <b>180°</b>.</li><li>Rotate the camera <b>154°</b> about X (that is 180° − 26°, the dome tilt).</li><li>Output 1024 × 1024 while you design.</li></ol>'},
+    python:{name:'Python', ex:'EX-02 Tide', install:{
+      win:'<p>Install Python 3.10 or newer from <a href="https://www.python.org/downloads/">python.org</a> (tick “Add to PATH”). Then in a terminal: <code>pip install numpy pillow</code>. For video: <code>winget install Gyan.FFmpeg</code>.</p>',
+      mac:'<p>Install Python 3.10 or newer (<code>brew install python</code> or <a href="https://www.python.org/downloads/">python.org</a>). Then <code>pip3 install numpy pillow</code> and <code>brew install ffmpeg</code>.</p>',
+      linux:'<p>Python 3.10+ is usually there. Install <code>python3-numpy python3-pil ffmpeg</code> with your package manager, or use <code>pip install numpy pillow</code> in a virtual environment.</p>'},
+      setup:'<p>Every frame you write is a dome master: a square, equidistant fisheye, front at the bottom edge. Start from <code>tide.py</code> in EX-02 and change the content, not the projection.</p>'},
+    p5:{name:'p5.js', ex:'EX-04 Chorus', install:{all:'<p>Nothing to install. EX-04 bundles p5.js and runs offline: open <code>chorus.html</code> in Chrome, Edge or Firefox.</p>'},
+      setup:'<p>Click in Chorus to add voices. Press <kbd>S</kbd> to save a PNG dome master. For Track A, save frames and join them with ffmpeg (see the delivery spec).</p>'},
+    footage:{name:'your own footage', ex:'EX-10 Flight', install:{
+      win:'<p>Install Python 3.10+ from <a href="https://www.python.org/downloads/">python.org</a>, then <code>pip install numpy opencv-python</code> and <code>winget install Gyan.FFmpeg</code>.</p>',
+      mac:'<p><code>brew install python ffmpeg</code>, then <code>pip3 install numpy opencv-python</code>.</p>',
+      linux:'<p>Install <code>ffmpeg</code> with your package manager and <code>pip install numpy opencv-python</code> in a virtual environment.</p>'},
+      setup:'<p>Never paste flat footage straight onto the dome master. Put it on a card <b>in the room</b> and let the fisheye do the bending, as EX-10 does. EX-10 uses a stock clip you download yourself from UltraKey (see Credits); or shoot your own.</p>'},
+    slides:{name:'slides or photos', ex:'EX-08 Flat to Dome', install:{all:'<p>Nothing to install for stills: <code>flat2dome.html</code> in EX-08 runs in the browser. For video you need ffmpeg (EX-08 has the one-line command).</p>'},
+      setup:'<p>Export your slides as 16:9 images. Drop each one into <code>flat2dome.html</code>: it puts the slide on a screen about 60° wide at the sweet spot and exports a dome master.</p>'},
+    td:{name:'TouchDesigner', ex:'EX-05', install:{
+      win:'<p>Download TouchDesigner from <a href="https://derivative.ca/download">derivative.ca</a> and register a licence.</p>',
+      mac:'<p>Download TouchDesigner from <a href="https://derivative.ca/download">derivative.ca</a> and register a licence.</p>',
+      linux:'<p class="warn">TouchDesigner runs on Windows and macOS only. Use a group member\'s Windows or Mac laptop, or pick another tool.</p>'},
+      warn:'The free Non-Commercial licence limits output to 1280 × 1280. Design at 1024², and ask the course team about a licence before you rely on 2048².',
+      setup:'<p>Follow the recipe in EX-05: a fisheye render, then a Null TOP. Rotate X = 64 so the camera leans like the dome. The two GLSL TOPs in EX-05 draw the comfortable zone and convert 360 footage.</p>'},
+    unity:{name:'Unity', ex:'EX-06', install:{all:'<p>Install <a href="https://unity.com/download">Unity Hub</a> and a Unity editor with a free Personal licence. EX-06 explains which dome package it uses and how to add it.</p>'},
+      setup:'<p>Set up the dome camera rig as in EX-06 at 2048 × 2048. Place objects with <code>DomePlacement.cs</code> by azimuth and elevation, not by coordinates.</p>'},
+    webgl:{name:'WebGL', ex:'EX-03 Pulse', install:{all:'<p>Nothing to install. Open <code>pulse.html</code> from EX-03 in Chrome or Edge, in its own window.</p>'},
+      setup:'<p>Press <b>Enable microphone</b>, then <kbd>H</kbd> to hide the panel. Edit the shader in a text editor and reload.</p>'},
+    openspace:{name:'OpenSpace', ex:'EX-07', install:{all:'<p>Download OpenSpace from <a href="https://www.openspaceproject.com/installation">openspaceproject.com</a>. It needs a capable graphics card; try it early.</p>'},
+      setup:'<p>In the OpenSpace launcher pick a window configuration with <b>fisheye</b> in its name. Load <code>malmo_marker.asset</code> and run <code>tour.lua</code> from EX-07.</p>'}
+  };
+
+  function stages(){
+    var tr = S.a.track, os = S.a.os, tool = TOOL[S.a.tool], live = tr === 'B';
+    var st = [];
+
+    st.push({t:'Get the simulator working', steps:[
+      {id:'sim-open', t:'Open the Dome Simulator', d:'<p>Use Chrome, Edge or Firefox. It runs from this site; nothing to install.</p>', go:[SIM,'Open the Dome Simulator']},
+      {id:'sim-card', t:'Check the test card', d:'<p>Press <b>Test card</b>. You should see <b>FRONT</b> at the bottom of the small fisheye inset, a green comfortable zone in front of you and a gold sweet spot with a checkerboard.</p>'},
+      {id:'sim-venue', t:'Check the venue settings', d:'<p>Under <b>Venue</b>: tilt <b>26°</b>, front edge <b>bottom</b>. Leave them unless this site says the venue has told us otherwise.</p>'},
+      {id:'sim-seats', t:'Try the seats', d:'<p>Press <kbd>L</kbd> to look at the sweet spot, then <kbd>4</kbd> (back row) and <kbd>5</kbd> (back row, far left). <kbd>G</kbd> turns the guides on and off, <kbd>P</kbd> saves a picture of the view.</p>'}
+    ]});
+
+    var ts = [{id:'tool-install', t:'Install '+tool.name, d:osPick(tool.install)}];
+    if (tool.warn) ts.push({id:'tool-warn', t:'Know the licence limit', d:'<p class="warn">'+tool.warn+'</p>'});
+    ts.push({id:'tool-example', t:'Get '+tool.ex, d:'<p>Download the examples pack from the Releases page and open the <b>'+tool.ex+'</b> folder. Its README says what to run and what to change first.</p>', go:[REL,'Releases page']});
+    ts.push({id:'tool-setup', t:'Set up '+tool.name+' for the dome', d:tool.setup});
+    st.push({t:'Your tool', steps:ts});
+
+    var r = [];
+    if (!live){
+      r.push({id:'a-open', t:'Put a test frame into the simulator', d:'<p>Render or save <b>one frame at 1024²</b>. In the simulator press <b>Open file…</b>, or drag the file onto the page. PNG, JPG, MP4 and WebM all work.</p>', go:[SIM,'Dome Simulator']});
+      r.push({id:'a-check', t:'Check it from three seats', d:'<p>Reference seat, back row (<kbd>4</kbd>), far side (<kbd>5</kbd>). The subject belongs in the green zone, aimed at the gold sweet spot. If it sits high in the middle, move it towards the bottom edge of the master.</p>'});
+      r.push({id:'a-video', t:'Try a short video', d:'<p>Encode 5–10 seconds and open it the same way. Watch a whole loop without the guides (<kbd>G</kbd>): motion that feels calm on a laptop is much faster on an 11.6 m dome.</p>'});
+    } else {
+      r.push({id:'b-share', t:'Share your window into the simulator', d:'<p>Run your piece in its own window. In the simulator press <b>Share a screen, window or tab…</b> and pick it. If the circle doesn\'t meet the edge of the inset, adjust <b>Crop → Size</b>.</p>'
+        + osPick({mac:'<p>macOS asks for permission the first time: System Settings → Privacy &amp; Security → <b>Screen &amp; System Audio Recording</b> → allow your browser, then restart the browser.</p>',
+                  linux:'<p>On Wayland the browser asks through the desktop\'s screen-sharing dialog. If no windows are listed, share the whole screen.</p>'}), go:[SIM,'Dome Simulator']});
+      r.push({id:'b-vmon', t:'Optional: a virtual Dome monitor', d:osPick({
+        win:'<p>Gives Windows a second, invisible 2048 × 2048 screen. From the Releases page download <b>virtual-monitor-windows</b>, then run <code>install-dome-monitor.bat</code> once and <code>dome-monitor-on.bat</code> (both ask for administrator rights). Put your piece fullscreen on the new screen and share <b>that screen</b> in the simulator. <code>dome-monitor-off.bat</code> switches it off; <code>uninstall-dome-monitor.bat</code> removes the driver.</p><p class="warn">This installs a signed display driver. Use it on your own laptop, not a university machine.</p>',
+        mac:'<p>Install <a href="https://github.com/Stengo/DeskPad">DeskPad</a> (free) or BetterDisplay. DeskPad has no square mode: choose 2560 × 1440, put your dome master in the middle, and the simulator crops the centre square. Then share that display.</p>',
+        linux:'<p>On X11: from the Releases page download <b>virtual-monitor-linux</b> and run <code>./dome-monitor.sh on</code>, then <code>./dome-monitor.sh move</code> and click your window to put it on the new screen. <code>./dome-monitor.sh off</code> removes it. On GNOME Wayland, log in to “GNOME on Xorg” first.</p>'}), go:[REL,'Releases page']});
+      r.push({id:'b-ndi', t:'Send NDI, the way the venue takes it', d:'<p>From the Releases page download <b>ndi-bridge</b>. Run <code>start-test-sender</code> first, then <code>start-ndi-bridge</code>: the first run sets itself up (it needs Python 3.10+) and opens the simulator. Pick the source next to <b>NDI…</b>. The status bar should say about 30 of 30 fps.</p>'
+        + '<p>Then send NDI from your own tool instead of the test sender'+({td:' (an <b>NDI Out TOP</b> after your Null TOP)', unity:' (enable NDI on the dome camera rig, see EX-06)'}[S.a.tool] || ' (NDI Tools\' Screen Capture works for browser pieces)')+'.</p>'
+        + '<p>On eduroam NDI can\'t find other computers. Use <code>--ips</code> with the other computer\'s address, or put both on a phone hotspot.</p>', go:[REL,'Releases page']});
+    }
+    if (has('capture')) r.push({id:'hw-capture', t:'Use your capture card', d:'<p>Laptop HDMI → capture card → USB on the computer running the simulator. Your laptop now has a 1920 × 1080 second display: put your dome master fullscreen on it, centred with black at the sides. In the simulator: <b>Camera / capture card</b> → pick the card → <b>Start device</b>. The centre crop takes the middle square.</p>'});
+    if (has('quest')) r.push({id:'hw-quest', t:'Look around in the Quest', d:'<p>The Quest is a preview tool, not your deliverable: you are making a dome piece, not a VR piece. The Quest dome viewer and its guide will be linked from this site; until then, use the simulator and ask on Canvas.</p>'});
+    st.push({t: live ? 'Get your live output into the simulator' : 'See your own frames in the dome', steps:r});
+
+    var v = [];
+    if (live){
+      v.push({id:'v-eth', t:'Two Ethernet links', d: has('eth') ? '<p>You have the ports. Label which one is for NDI (video) and which for Dante (audio), and test both before Friday.</p>' : '<p class="warn">You need two Ethernet links in the venue: one for NDI video, one for Dante audio. Get USB-Ethernet adapters now.</p>'});
+      v.push({id:'v-dante', t:'Plan the sound', d:'<p>The dome takes sound by Dante, 6 channels (5.1). Sending Dante from a laptop needs Dante Virtual Soundcard, which is paid: <b>ask on Canvas before you buy a licence</b>.</p>'});
+      v.push({id:'v-runbook', t:'Write runbook.md', d:'<p>How a stranger starts your system in under two minutes: what to plug in, what to launch, in which order.</p>'});
+      v.push({id:'v-fallback', t:'Record the fallback', d:'<p>Record your piece running, convert it to the delivery spec and hand it in by <b>Friday 08:00</b>. No fallback, no live slot.</p>', go:['../delivery/','Delivery spec']});
+    } else {
+      v.push({id:'v-sound', t:'Plan the sound', d:'<p>5.1 or stereo, as separate mono WAVs at 48 kHz / 16-bit, with a sync blip on frame 1.</p>', go:['../delivery/#audio','Audio spec']});
+      v.push({id:'v-render', t:'Leave time for the final render', d:'<p>2048 × 2048 at 30 fps for 90–180 s is thousands of frames. Start the final render on Thursday at the latest. Files are due <b>Friday 08:00</b>.</p>', go:['../delivery/','Delivery spec']});
+    }
+    st.push({t:'Before Friday', steps:v});
+    return st;
+  }
+
+  function renderPlan(){
+    var st = stages(), all = [];
+    st.forEach(function(s){ s.steps.forEach(function(x){ all.push(x.id); }); });
+    var labels = {A:'Track A — a film', B:'Track B — live', win:'Windows', mac:'macOS', linux:'Linux'};
+    var hw = (S.a.hw||[]).map(function(h){ return {capture:'capture card', quest:'Quest 3', eth:'2 × Ethernet'}[h]; });
+    var h = '<div class="summary"><div class="chips">'
+      + [labels[S.a.track], labels[S.a.os], TOOL[S.a.tool].name].concat(hw).map(function(c){ return '<span class="chip">'+c+'</span>'; }).join('')
+      + '</div><div class="meter" aria-hidden="true"><i id="pm"></i></div><div class="actions"><span class="mtxt" id="pt"></span><button type="button" class="ghost" id="edit">Change my answers</button><button type="button" class="ghost" id="reset">Clear my ticks</button></div></div>';
+    st.forEach(function(s, i){
+      h += '<section class="stage"><h2><span class="n">'+(i+1)+'/'+st.length+'</span>'+s.t+'</h2><ol>';
+      s.steps.forEach(function(x){
+        var on = !!S.done[x.id];
+        h += '<li class="step'+(on?' done':'')+'" data-id="'+x.id+'"><input type="checkbox" id="s-'+x.id+'"'+(on?' checked':'')+' aria-labelledby="t-'+x.id+'">'
+          + '<div class="sb"><label class="st" id="t-'+x.id+'" for="s-'+x.id+'">'+x.t+'</label><div class="sd">'+x.d+'</div>'
+          + (x.go ? '<a class="go" href="'+x.go[0]+'"'+(/^https?:/.test(x.go[0])?' target="_blank" rel="noopener"':'')+'>'+x.go[1]+' →</a>' : '') + '</div></li>';
+      });
+      h += '</ol></section>';
+    });
+    h += '<section class="stage"><h2><span class="n">next</span>Make your own piece</h2><p>Your rig works. Read <a href="../week/">the week</a> for what has to exist by tonight, and keep <a href="../reference/comfortable-zone/">Where to put things</a> open while you work.</p></section>';
+    plan.innerHTML = h; plan.hidden = false;
+    progress(all);
+    plan.onchange = function(e){
+      var li = e.target.closest('.step'); if (!li) return;
+      var id = li.getAttribute('data-id');
+      if (e.target.checked) S.done[id] = true; else delete S.done[id];
+      li.classList.toggle('done', e.target.checked); persist(); progress(all);
+    };
+    document.getElementById('edit').onclick = function(){ document.getElementById('f-track').scrollIntoView(); };
+    document.getElementById('reset').onclick = function(){ S.done = {}; persist(); renderPlan(); };
+  }
+  function progress(all){
+    var d = all.filter(function(id){ return S.done[id]; }).length;
+    document.getElementById('pm').style.width = (100*d/all.length) + '%';
+    document.getElementById('pt').textContent = d + ' of ' + all.length + ' steps done';
+  }
+
+  renderForm();
+  if (S.shown && ready()) renderPlan();
+})();
+</script>
+</body>
+</html>

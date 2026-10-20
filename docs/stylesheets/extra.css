@@ -1,0 +1,48 @@
+/* Wisdome 360 — site colours. Dusk blue header, warm "front" accent, the same pair the examples use
+   (warm in front, cool behind). */
+:root,
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #1d3557;
+  --md-primary-fg-color--light: #2b4a75;
+  --md-primary-fg-color--dark: #142640;
+  --md-accent-fg-color: #b8650f;
+  --md-typeset-a-color: #2b5c8a;
+  --w360-zone: #2f7d4f;
+  --w360-sweet: #b8650f;
+  --w360-card: #f2f5f9;
+  --w360-line: #dbe2ea;
+}
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #142640;
+  --md-primary-fg-color--light: #1d3557;
+  --md-primary-fg-color--dark: #0d1a2c;
+  --md-accent-fg-color: #e8a24a;
+  --md-typeset-a-color: #7fb0de;
+  --md-default-bg-color: #0f1621;
+  --w360-zone: #5fbf83;
+  --w360-sweet: #e8a24a;
+  --w360-card: #172130;
+  --w360-line: #26344a;
+}
+.md-header, .md-tabs { background-color: var(--md-primary-fg-color); }
+.md-typeset h1 { font-weight: 700; letter-spacing: -0.01em; }
+
+/* Day cards on the week page */
+.w360-days { display: grid; gap: .8rem; margin: 1rem 0; }
+.w360-day { border: 1px solid var(--w360-line); border-left: 4px solid var(--md-primary-fg-color--light);
+  background: var(--w360-card); border-radius: 6px; padding: .6rem 1rem .4rem; }
+.w360-day.session { border-left-color: var(--w360-sweet); }
+.w360-day h3 { margin: .2rem 0 .3rem !important; font-size: 1rem; }
+.w360-day .when { font-family: var(--md-code-font-family); font-size: .72rem; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--w360-sweet); }
+.w360-day p, .w360-day ul { margin: .3rem 0 .5rem; }
+
+/* "Where does this live?" table */
+.w360-split td:first-child { white-space: nowrap; font-weight: 700; }
+
+/* Big link buttons on the home page */
+.w360-go { display: flex; flex-wrap: wrap; gap: .6rem; margin: 1rem 0 1.4rem; }
+.w360-go a { display: inline-block; padding: .55rem 1rem; border-radius: 6px; font-weight: 700;
+  border: 1px solid var(--md-primary-fg-color--light); }
+.w360-go a.primary { background: var(--md-accent-fg-color); border-color: var(--md-accent-fg-color); color: #fff; }
+[data-md-color-scheme="slate"] .w360-go a.primary { color: #10161f; }
