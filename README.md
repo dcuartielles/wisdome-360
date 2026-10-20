@@ -16,6 +16,17 @@ mkdocs serve                                      # http://127.0.0.1:8000
 
 Pushing to `main` publishes the site through GitHub Actions (`.github/workflows/pages.yml`). In the repository settings, set **Pages → Source** to **GitHub Actions** once.
 
+## Publishing
+
+Only the local Claude Code agent (or David) commits and pushes. Anyone else who changes files, including Claude sessions working on this folder from claude.ai, adds a line under `## Pending` in `.publish-queue.md` (git-ignored) instead of running git.
+
+The Claude Code hooks and commands live in `claude-setup/` and are copied into `.claude/` (git-ignored) on each computer; the status script says when that copy is missing or out of date. When Claude Code starts in this folder, a hook runs `scripts/publish_status.py` and reports anything waiting: queued entries, uncommitted files, unpushed commits. Then:
+
+- `/first-push`: once, creates the GitHub repository, pushes and turns on Pages.
+- `/publish`: runs `scripts/preflight.py` (strict build, no videos or files over 95 MB, credits for new media), commits, pushes and watches the deploy.
+
+See `CLAUDE.md` for the rules.
+
 ## Layout
 
 ```text

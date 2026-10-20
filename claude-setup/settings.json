@@ -1,0 +1,45 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && (python3 scripts/publish_status.py 2>/dev/null || python scripts/publish_status.py)",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && (python3 scripts/publish_status.py --quiet 2>/dev/null || python scripts/publish_status.py --quiet)",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git fetch:*)",
+      "Bash(python scripts/publish_status.py:*)",
+      "Bash(python3 scripts/publish_status.py:*)",
+      "Bash(python scripts/preflight.py:*)",
+      "Bash(python3 scripts/preflight.py:*)",
+      "Bash(mkdocs build:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh run watch:*)"
+    ],
+    "deny": [
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)"
+    ]
+  }
+}
