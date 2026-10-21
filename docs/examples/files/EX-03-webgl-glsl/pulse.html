@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pulse — live dome</title>
+<style>
+:root{--bg:#06090f;--fg:#f2f5fa;--dim:#8fa3be;--ac:#ff7e4d;--panel:#101725;--line:#24314a}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
+#stage{position:fixed;inset:0;display:grid;place-items:center;background:#000}
+canvas{display:block;background:#000;max-width:100%;max-height:100%}
+#ui{position:fixed;top:0;left:0;padding:14px;width:min(330px,94vw);z-index:5;
+  max-height:100vh;overflow:auto}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  padding:13px 14px;margin-bottom:9px}
+h1{font-size:14px;margin:0;letter-spacing:.14em;text-transform:uppercase;color:var(--ac)}
+p{font-size:12px;line-height:1.5;color:var(--dim);margin:6px 0 0}
+button{width:100%;margin-top:7px;padding:10px;border-radius:8px;cursor:pointer;
+  background:#1a2434;color:var(--fg);border:1px solid var(--line);font-size:13px}
+button.primary{background:var(--ac);color:#16202e;border-color:var(--ac);font-weight:700}
+button.rec{background:#c0392b;border-color:#c0392b;color:#fff;font-weight:700}
+.row{display:flex;gap:8px;align-items:center;margin-top:9px;font-size:12px;color:var(--dim)}
+.row input[type=range]{flex:1;accent-color:var(--ac)}
+.row span.v{width:38px;text-align:right;color:var(--fg);font-variant-numeric:tabular-nums}
+#meter{height:5px;background:#1a2434;border-radius:3px;overflow:hidden;margin-top:9px}
+#meterbar{height:100%;width:0;background:var(--ac);transition:width .05s}
+#msg{font-size:11.5px;color:var(--ac);margin-top:7px;min-height:1em}
+kbd{background:#1a2434;border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:11px}
+.hidden{display:none!important}
+#toggle{position:fixed;right:12px;top:12px;width:auto;margin:0;padding:7px 11px;z-index:6}
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="c"></canvas></div>
+<button id="toggle">hide</button>
+
+<div id="ui">
+  <div class="card">
+    <h1>Pulse</h1>
+    <p>A live fisheye dome master, rendered every frame by one fragment shader.
+       This is a <b>live-piece</b> template: fork it, change the shader, plug the
+       laptop into the dome.</p>
+    <button id="mic" class="primary">Enable microphone</button>
+    <div id="meter"><div id="meterbar"></div></div>
+    <button id="dome">Dome output (fullscreen)</button>
+    <button id="shot">Save PNG dome master</button>
+    <button id="rec" class="rec">Record fallback clip</button>
+    <div id="msg"></div>
+  </div>
+
+  <div class="card">
+    <div class="row"><span>Bands</span><input id="bands" type="range" min="1" max="14" step="1" value="6"><span class="v" id="bandsv">6</span></div>
+    <div class="row"><span>Speed</span><input id="speed" type="range" min="0" max="1.2" step="0.01" value="0.30"><span class="v" id="speedv">.30</span></div>
+    <div class="row"><span>Curtains</span><input id="curt" type="range" min="0" max="1" step="0.01" value="0.55"><span class="v" id="curtv">.55</span></div>
+    <div class="row"><span>Reactivity</span><input id="react" type="range" min="0" max="2" step="0.01" value="1.00"><span class="v" id="reactv">1.0</span></div>
+    <div class="row"><span>Warmth</span><input id="warm" type="range" min="0" max="1" step="0.01" value="0.60"><span class="v" id="warmv">.60</span></div>
+    <div class="row"><span>Brightness</span><input id="gain" type="range" min="0.2" max="2" step="0.01" value="1.00"><span class="v" id="gainv">1.0</span></div>
+    <p><kbd>G</kbd> comfortable zone &amp; sweet spot &middot; <kbd>F</kbd> front marker &middot; <kbd>H</kbd> hide panel &middot; <kbd>Esc</kbd> leave fullscreen</p>
+  </div>
+</div>
+
+<script id="vs" type="x-shader/x-vertex">#version 300 es
+in vec2 p; void main(){ gl_Position = vec4(p,0.,1.); }
+</script>
+
+<script id="fs" type="x-shader/x-fragment">#version 300 es
+precision highp float;
+out vec4 frag;
+
+uniform vec2  uRes;       // square canvas
+uniform float uTime;
+uniform float uLevel;     // microphone loudness, 0..1, smoothed
+uniform float uBass;      // low-band energy, 0..1
+uniform float uBands, uSpeed, uCurtains, uReact, uWarm, uGain;
+uniform float uGuide, uFront;
+
+const float PI = 3.14159265359;
+
+// ---- hash / value noise, plain and cheap ---------------------------------
+float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise(vec2 p){
+  vec2 i = floor(p), f = fract(p);
+  f = f*f*(3.0-2.0*f);
+  return mix(mix(hash(i), hash(i+vec2(1,0)), f.x),
+             mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), f.x), f.y);
+}
+float fbm(vec2 p){
+  float v = 0.0, a = 0.5;
+  for(int i=0;i<4;i++){ v += a*noise(p); p *= 2.02; a *= 0.5; }
+  return v;
+}
+
+// ---- the audience's point of view -----------------------------------------
+// Wisdome Malmo is tilted 26 deg, raised at the back. So the centre of the
+// dome master is NOT overhead: it is 64 deg up, in front of the audience.
+// roomDir() undoes the tilt: master position -> direction in the ROOM
+// (x = right, y = front, z = up). The guides below are measured with it.
+const float TILT = 26.0;
+vec3 roomDir(vec2 p){
+  float r  = length(p);
+  float th = r * PI * 0.5;                              // angle from the DOME's zenith
+  vec2  d  = r > 1e-6 ? p / r : vec2(0.0);
+  vec3  l  = vec3(sin(th)*d.x, -sin(th)*d.y, cos(th));  // dome frame, y = front
+  float c = cos(radians(TILT)), s = sin(radians(TILT));
+  return vec3(l.x, l.y*c + l.z*s, -l.y*s + l.z*c);
+}
+float guideLine(float distDeg, float w){ return 1.0 - smoothstep(w*0.5, w*0.5 + 0.35, abs(distDeg)); }
+
+void main(){
+  // ---------------------------------------------------------------------
+  // STEP 1 -- turn this pixel into a DIRECTION IN THE ROOM, as the
+  // audience sees it: azimuth 0 = the front, elevation 0 = eye level.
+  // Everything after this is composed in those degrees, never in pixels.
+  // roomDir() (above) undoes the dome's 26 deg tilt.
+  // ---------------------------------------------------------------------
+  vec2 p = (gl_FragCoord.xy / uRes) * 2.0 - 1.0;   // -1..1, y up
+  float r = length(p);
+  if (r > 1.0) { frag = vec4(0,0,0,1); return; }   // outside the circle: black
+
+  vec3  rd   = roomDir(p);
+  float elev = degrees(asin(clamp(rd.z, -1.0, 1.0)));   // 0 = eye level, 90 = straight up
+  float az   = degrees(atan(rd.x, rd.y));               // 0 = FRONT, + = right
+  az = mod(az + 360.0, 360.0);
+  float dElev = (1.0 - r) * 90.0;                  // the DOME's own elevation: 0 at its rim
+
+  // the comfortable zone is in front: 1 within +-60 deg of the front, fading behind
+  float aFront = abs(mod(az + 180.0, 360.0) - 180.0);
+  float front  = 1.0 - smoothstep(55.0, 115.0, aFront);
+
+  float lvl  = uLevel * uReact;
+  float bass = uBass  * uReact;
+
+  vec3 col = vec3(0.0);
+
+  // ---------------------------------------------------------------------
+  // STEP 2 -- ribbons of light at (roughly) constant elevation: the SUBJECT.
+  //
+  // They sit 16-60 deg above eye level -- the height of the comfortable
+  // zone -- and are brightest in front, where the audience looks. A ring at a
+  // constant elevation looks inert; letting the elevation wobble with
+  // azimuth turns it into a rosette and makes the second dimension visible.
+  // ---------------------------------------------------------------------
+  float travel = uTime * uSpeed;
+  float ribbons = 0.0;
+  for (int i = 0; i < 14; i++) {
+    if (float(i) >= uBands) break;
+    float fi   = float(i);
+    float base = 16.0 + 44.0 * (fi + 0.5) / max(uBands, 1.0);   // 16..60 deg
+    float lobes = 2.0 + mod(fi, 4.0);
+    float amp   = (2.2 + 2.4 * fract(sin(fi * 12.9898) * 43758.5453));
+    amp *= 1.0 + 1.6 * bass;
+    float wob = base + amp * sin(radians(az) * lobes + travel * (1.0 + 0.3 * fi) + fi);
+    float th  = 1.5 + 1.1 * sin(fi * 2.1) + 2.0 * lvl;
+    float d   = abs(elev - wob) / max(th, 0.35);
+    ribbons  += exp(-d * d * 2.2) * (0.55 + 0.45 * sin(fi * 1.7 + travel));
+  }
+  // fade below the zone and overhead; dim behind the audience
+  float vis = smoothstep(5.0, 14.0, elev) * (1.0 - smoothstep(62.0, 82.0, elev));
+  ribbons *= vis * mix(0.35, 1.0, front);
+
+  // ---------------------------------------------------------------------
+  // STEP 3 -- curtains standing up from eye level, drifting around the
+  // audience: ambience that wraps all the way round. (Behind the audience the
+  // picture only starts about 36 deg up, so there you see just their tops.)
+  // ---------------------------------------------------------------------
+  // Sampling the noise ON A CIRCLE makes it periodic in azimuth by
+  // construction. Feed azimuth in directly and you get a hard seam at the
+  // front of the room, which is the first bug everyone hits on a dome.
+  float ar = radians(az);
+  vec2  q  = vec2(cos(ar), sin(ar)) * 4.5 + vec2(cos(ar*3.0), sin(ar*3.0)) * 1.4;
+  float cz = fbm(q + vec2(travel * 0.20, elev * 0.02));
+  float curtain = pow(max(cz - 0.40, 0.0) * 2.8, 1.7);
+  curtain *= smoothstep(3.0, 18.0, elev) * (1.0 - smoothstep(24.0, 62.0, elev));
+  curtain *= uCurtains * (0.5 + 0.9 * lvl);
+
+  // ---------------------------------------------------------------------
+  // STEP 4 -- colour. Warm towards the FRONT of the room, cool behind, so
+  // the tilted dome has a direction instead of being a symmetric blob.
+  // ---------------------------------------------------------------------
+  float frontness = (cos(radians(az)) + 1.0) * 0.5;
+  vec3 warm = vec3(1.00, 0.36, 0.10);
+  vec3 cool = vec3(0.14, 0.45, 1.00);
+  vec3 tint = mix(cool, warm, mix(0.5, frontness, uWarm));
+
+  col += ribbons * tint * (1.05 + 1.6 * lvl);
+  col += curtain * mix(tint, vec3(0.55, 0.78, 1.0), 0.22) * 1.45;
+
+  // a narrow wash at the dome's rim: cheap depth, almost no average picture level
+  col += vec3(0.20, 0.10, 0.32) * pow(max(1.0 - dElev / 15.0, 0.0), 2.0) * 0.30;
+
+  // static point field, denser overhead so it is texture, not content
+  vec2 cell = floor(vec2(az * 1.6, elev * 1.6));
+  float st = step(0.965, hash(cell)) * step(0.5, hash(cell + 7.3));
+  col += vec3(0.62, 0.74, 1.0) * st * 0.42 * smoothstep(14.0, 55.0, elev);
+
+  // ---------------------------------------------------------------------
+  // Overlays for working, never for delivery.
+  // ---------------------------------------------------------------------
+  float rEl = elev;                                    // audience elevation, 0 = eye level
+  float rAz = mod(az + 180.0, 360.0) - 180.0;          // audience azimuth, 0 = front
+  if (uGuide > 0.5) {
+    // eye-level rings every 15 deg
+    float g = 0.0;
+    for (int i=0;i<6;i++) g = max(g, guideLine(rEl - float(i)*15.0, 0.25));
+    col = mix(col, vec3(0.45,0.60,1.0), g*0.45);
+    // comfortable zone: IN FRONT, 15-60 deg up, +-60 deg to the sides
+    float aaz = abs(rAz);
+    float inZone = step(15.0, rEl) * step(rEl, 60.0) * step(aaz, 60.0);
+    col = mix(col, col + vec3(0.015,0.035,0.02), inZone);
+    float edge = max(max(guideLine(rEl-15.0, 0.5), guideLine(rEl-60.0, 0.5)) * step(aaz, 60.0),
+                     guideLine((aaz-60.0)*cos(radians(rEl)), 0.5) * step(15.0, rEl) * step(rEl, 60.0));
+    col = mix(col, vec3(0.35,0.95,0.55), edge*0.9);
+    // sweet spot: straight ahead, 40 deg up
+    float a = degrees(acos(clamp(dot(rd, vec3(0.0, cos(radians(40.0)), sin(radians(40.0)))), -1.0, 1.0)));
+    col = mix(col, vec3(1.0,0.85,0.30), guideLine(a-12.0, 0.6));
+    col = mix(col, vec3(1.0,0.85,0.30), 1.0 - smoothstep(1.0, 1.4, a));
+  }
+  if (uFront > 0.5) {
+    col = mix(col, vec3(1.0,0.49,0.30),
+              (1.0-smoothstep(0.0,1.3,abs(rAz))) * (1.0-smoothstep(-20.0,8.0,rEl)));
+  }
+
+  col *= uGain;
+  col = col / (1.0 + col);                 // soft shoulder, nothing clips
+  col = pow(col, vec3(1.0/2.0));           // gamma
+  // pull a little saturation back after the tonemap
+  float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
+  col = clamp(mix(vec3(lum), col, 1.35), 0.0, 1.0);
+  frag = vec4(col, 1.0);
+}
+</script>
+
+<script>
+const cv = document.getElementById('c');
+const gl = cv.getContext('webgl2', { preserveDrawingBuffer: true, antialias: false });
+const msg = document.getElementById('msg');
+const say = t => msg.textContent = t;
+if (!gl) say('WebGL2 not available in this browser.');
+
+function sh(type, src){
+  const s = gl.createShader(type); gl.shaderSource(s, src.trim()); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.error(gl.getShaderInfoLog(s)); say('Shader error — see console.'); }
+  return s;
+}
+const prog = gl.createProgram();
+gl.attachShader(prog, sh(gl.VERTEX_SHADER,   document.getElementById('vs').textContent));
+gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, document.getElementById('fs').textContent));
+gl.linkProgram(prog); gl.useProgram(prog);
+if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) console.error(gl.getProgramInfoLog(prog));
+
+const buf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+const loc = gl.getAttribLocation(prog, 'p');
+gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+
+const U = {};
+for (const n of ['uRes','uTime','uLevel','uBass','uBands','uSpeed','uCurtains','uReact','uWarm','uGain','uGuide','uFront'])
+  U[n] = gl.getUniformLocation(prog, n);
+
+/* ---------- square canvas, always ---------- */
+let SIZE = 1024;
+function resize(){
+  const full = document.fullscreenElement;
+  SIZE = Math.min(full ? screen.width : innerWidth, full ? screen.height : innerHeight);
+  SIZE = Math.max(256, Math.floor(SIZE));
+  cv.width = cv.height = SIZE;
+  cv.style.width = cv.style.height = SIZE + 'px';
+  gl.viewport(0, 0, SIZE, SIZE);
+}
+addEventListener('resize', resize);
+document.addEventListener('fullscreenchange', resize);
+resize();
+
+/* ---------- audio ---------- */
+let analyser = null, freq = null, level = 0, bass = 0;
+document.getElementById('mic').addEventListener('click', async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:false, noiseSuppression:false } });
+    const ac = new (window.AudioContext || window.webkitAudioContext)();
+    const src = ac.createMediaStreamSource(stream);
+    analyser = ac.createAnalyser(); analyser.fftSize = 1024; analyser.smoothingTimeConstant = 0.75;
+    src.connect(analyser); freq = new Uint8Array(analyser.frequencyBinCount);
+    say('Microphone live — the room is now driving the dome.');
+  } catch (e) { say('Microphone refused. The sliders still work.'); }
+});
+
+/* ---------- controls ---------- */
+const ctl = {};
+for (const id of ['bands','speed','curt','react','warm','gain']) {
+  const el = document.getElementById(id), v = document.getElementById(id+'v');
+  ctl[id] = () => +el.value;
+  el.addEventListener('input', () => v.textContent = (+el.value).toFixed(id==='bands'?0:2).replace(/^0\./,'.'));
+}
+let guide = 0, front = 0;
+addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (k === 'g') guide = 1 - guide;
+  if (k === 'f') front = 1 - front;
+  if (k === 'h') document.getElementById('toggle').click();
+});
+document.getElementById('toggle').addEventListener('click', e => {
+  const ui = document.getElementById('ui'); ui.classList.toggle('hidden');
+  e.target.textContent = ui.classList.contains('hidden') ? 'show' : 'hide';
+});
+document.getElementById('dome').addEventListener('click', () => {
+  document.getElementById('ui').classList.add('hidden');
+  document.getElementById('toggle').textContent = 'show';
+  document.documentElement.requestFullscreen?.();
+});
+
+/* ---------- save a single dome master ---------- */
+document.getElementById('shot').addEventListener('click', () => {
+  cv.toBlob(b => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(b);
+    a.download = `pulse_domemaster_${SIZE}x${SIZE}.png`; a.click();
+  }, 'image/png');
+  say(`Saved a ${SIZE}×${SIZE} dome master.`);
+});
+
+/* ---------- record the fallback clip every live piece needs ---------- */
+let mr = null, chunks = [];
+document.getElementById('rec').addEventListener('click', e => {
+  if (mr && mr.state === 'recording') { mr.stop(); return; }
+  chunks = [];
+  const stream = cv.captureStream(30);
+  const type = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
+  mr = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 40e6 });
+  mr.ondataavailable = ev => ev.data.size && chunks.push(ev.data);
+  mr.onstop = () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(chunks, { type:'video/webm' }));
+    a.download = `pulse_fallback_${SIZE}x${SIZE}.webm`; a.click();
+    e.target.textContent = 'Record fallback clip'; e.target.classList.add('rec');
+    say('Saved .webm — convert it to the delivery spec with the ffmpeg line in the README.');
+  };
+  mr.start();
+  e.target.textContent = '■ Stop recording';
+  say('Recording. Stop when you have enough.');
+});
+
+/* ---------- loop ---------- */
+const bar = document.getElementById('meterbar');
+const t0 = performance.now();
+function loop(){
+  if (analyser) {
+    analyser.getByteFrequencyData(freq);
+    let sum = 0, b = 0;
+    for (let i = 0; i < freq.length; i++) sum += freq[i];
+    for (let i = 0; i < 12; i++) b += freq[i];
+    const l = Math.min(1, (sum / freq.length) / 110);
+    const bb = Math.min(1, (b / 12) / 150);
+    level += (l - level) * 0.25;
+    bass  += (bb - bass) * 0.35;
+    bar.style.width = (level * 100) + '%';
+  }
+  gl.uniform2f(U.uRes, SIZE, SIZE);
+  gl.uniform1f(U.uTime, (performance.now() - t0) / 1000);
+  gl.uniform1f(U.uLevel, level);
+  gl.uniform1f(U.uBass, bass);
+  gl.uniform1f(U.uBands, ctl.bands());
+  gl.uniform1f(U.uSpeed, ctl.speed());
+  gl.uniform1f(U.uCurtains, ctl.curt());
+  gl.uniform1f(U.uReact, ctl.react());
+  gl.uniform1f(U.uWarm, ctl.warm());
+  gl.uniform1f(U.uGain, ctl.gain());
+  gl.uniform1f(U.uGuide, guide);
+  gl.uniform1f(U.uFront, front);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>

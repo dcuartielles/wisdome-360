@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Flat to Dome</title>
+<style>
+  :root{--bg:#06090f;--fg:#f2f5fa;--dim:#8fa3be;--ac:#ff7e4d;--panel:#101725;--line:#24314a}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+  body{display:grid;grid-template-columns:minmax(260px,330px) 1fr;min-height:100%}
+  aside{padding:16px;border-right:1px solid var(--line);overflow:auto}
+  main{display:grid;place-items:center;padding:12px;min-width:0}
+  canvas{width:min(100%,calc(100vh - 24px));aspect-ratio:1;background:#000;border-radius:50%}
+  h1{font-size:15px;letter-spacing:.14em;text-transform:uppercase;color:var(--ac);margin:0 0 4px}
+  p{font-size:12.5px;line-height:1.5;color:var(--dim);margin:6px 0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 13px;margin-bottom:10px}
+  .row{display:flex;gap:8px;align-items:center;margin-top:8px;font-size:12.5px;color:var(--dim)}
+  .row span:first-child{width:92px;flex:none}
+  .row input[type=range]{flex:1;accent-color:var(--ac);min-width:0}
+  .row output{width:52px;text-align:right;color:var(--fg);font-variant-numeric:tabular-nums}
+  button,label.btn,select{display:block;width:100%;margin-top:8px;padding:10px;border-radius:8px;cursor:pointer;background:#1a2434;color:var(--fg);border:1px solid var(--line);font-size:13px;text-align:center;font-family:inherit}
+  button.primary{background:var(--ac);color:#16202e;border-color:var(--ac);font-weight:700}
+  input[type=file]{display:none}
+  #msg{font-size:12px;color:var(--ac);min-height:1em;margin-top:6px}
+  code{color:var(--fg)}
+  @media (max-width:760px){body{grid-template-columns:1fr}aside{border-right:0;border-bottom:1px solid var(--line)}}
+</style>
+</head>
+<body>
+<aside>
+  <div class="card">
+    <h1>Flat to Dome</h1>
+    <p>Puts a flat picture or video on a <b>virtual screen</b> in front of the audience and photographs it with the dome's fisheye — so it looks <b>flat and straight</b> from the seats. Wisdome Malmö: tilted 26°, sweet spot 40° up.</p>
+    <label class="btn" for="pick">Choose image or video…</label>
+    <input id="pick" type="file" accept="image/*,video/*">
+    <button id="test">Test card (16:9 grid)</button>
+    <div id="msg"></div>
+  </div>
+  <div class="card">
+    <div class="row"><span>Screen width</span><input id="width" type="range" min="10" max="150" step="1" value="60"><output id="widthv"></output></div>
+    <div class="row"><span>Height of centre</span><input id="elev" type="range" min="5" max="70" step="0.5" value="40"><output id="elevv"></output></div>
+    <div class="row"><span>Left / right</span><input id="az" type="range" min="-90" max="90" step="1" value="0"><output id="azv"></output></div>
+    <div class="row"><span>Dome tilt</span><input id="tilt" type="range" min="0" max="30" step="1" value="26"><output id="tiltv"></output></div>
+    <select id="shape"><option value="0">Flat screen</option><option value="1">Curved screen (wraps round the audience)</option></select>
+    <select id="guides"><option value="1">Show comfortable zone + sweet spot</option><option value="0">No guides (for export)</option></select>
+    <p id="info"></p>
+  </div>
+  <div class="card">
+    <select id="res"><option value="2048">Export 2048 × 2048</option><option value="4096">Export 4096 × 4096</option></select>
+    <button id="png" class="primary">Save PNG dome master</button>
+    <button id="rec">Record video (WebM, real time)</button>
+    <p>For a whole video file, ffmpeg is faster: see the README for the one-line command.</p>
+  </div>
+</aside>
+<main><canvas id="c" width="1024" height="1024"></canvas></main>
+
+<script id="fs" type="x-shader/x-fragment">#version 300 es
+precision highp float;
+out vec4 frag;
+uniform sampler2D uImg;
+uniform vec2 uRes;
+uniform float uW, uAspect, uEl, uAz, uTilt, uCurved, uGuides, uHas;
+const float PI = 3.14159265359, DEG = PI / 180.0;
+float line(float d, float w){ float f = fwidth(d); return 1.0 - smoothstep(w * 0.5 - f, w * 0.5 + f, abs(d)); }
+void main(){
+  vec2 p = gl_FragCoord.xy / uRes * 2.0 - 1.0; p.y = -p.y;          // image coords: y down
+  float r = length(p);
+  if (r > 1.0) { frag = vec4(0.0, 0.0, 0.0, 1.0); return; }
+  // 1. master pixel -> dome direction (equidistant fisheye, 180 deg, front at the bottom)
+  float th = r * PI * 0.5, a = atan(p.x, p.y);
+  vec3 l = vec3(sin(th) * sin(a), sin(th) * cos(a), cos(th));
+  // 2. dome -> room (x right, y front, z up)
+  float ct = cos(uTilt * DEG), st = sin(uTilt * DEG);
+  vec3 d = vec3(l.x, l.y * ct + l.z * st, -l.y * st + l.z * ct);
+  // 3. the virtual screen
+  vec3 f = vec3(cos(uEl * DEG) * sin(uAz * DEG), cos(uEl * DEG) * cos(uAz * DEG), sin(uEl * DEG));
+  vec3 rr = normalize(cross(f, vec3(0.0, 0.0, 1.0)));
+  vec3 uu = cross(rr, f);
+  float hw = uW * 0.5 * DEG;
+  float df = dot(d, f), dr = dot(d, rr), du = dot(d, uu);
+  vec2 xy = vec2(-9.0);
+  if (uCurved > 0.5) { float h = length(vec2(dr, df)); if (h > 1e-5) xy = vec2(atan(dr, df) / hw, du / h / (hw / uAspect)); }
+  else if (df > 1e-5) xy = vec2(dr / df / tan(hw), du / df / (tan(hw) / uAspect));
+  vec2 uv = vec2(xy.x + 1.0, 1.0 - xy.y) * 0.5;
+  vec3 c = vec3(0.0);
+  if (all(greaterThanEqual(uv, vec2(0.0))) && all(lessThanEqual(uv, vec2(1.0)))) c = uHas > 0.5 ? texture(uImg, uv).rgb : vec3(0.1);
+  if (uGuides > 0.5) {
+    float el = asin(clamp(d.z, -1.0, 1.0)) / DEG, az = atan(d.x, d.y) / DEG, aaz = abs(az);
+    float edge = max(max(line(el - 15.0, 0.4), line(el - 60.0, 0.4)) * step(aaz, 60.0), line((aaz - 60.0) * cos(el * DEG), 0.4) * step(15.0, el) * step(el, 60.0));
+    c = mix(c, vec3(0.35, 0.95, 0.55), edge * 0.8);
+    float s = acos(clamp(dot(d, vec3(0.0, cos(40.0 * DEG), sin(40.0 * DEG))), -1.0, 1.0)) / DEG;
+    c = mix(c, vec3(1.0, 0.85, 0.3), line(s - 12.0, 0.5) * 0.8);
+    c = mix(c, vec3(1.0, 0.4, 0.25), line(el, 0.4) * 0.5);          // eye level
+  }
+  frag = vec4(c, 1.0);
+}
+</script>
+<script>
+const $ = (id) => document.getElementById(id);
+const cv = $('c');
+const gl = cv.getContext('webgl2', { preserveDrawingBuffer: true });
+const say = (t) => ($('msg').textContent = t);
+if (!gl) say('WebGL2 is not available in this browser.');
+function sh(type, src) { const s = gl.createShader(type); gl.shaderSource(s, src.trim()); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(s)); return s; }
+const prog = gl.createProgram();
+gl.attachShader(prog, sh(gl.VERTEX_SHADER, '#version 300 es\nin vec2 p; void main(){ gl_Position = vec4(p, 0.0, 1.0); }'));
+gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, $('fs').textContent));
+gl.linkProgram(prog); gl.useProgram(prog);
+const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+const loc = gl.getAttribLocation(prog, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+const U = {}; for (const n of ['uImg', 'uRes', 'uW', 'uAspect', 'uEl', 'uAz', 'uTilt', 'uCurved', 'uGuides', 'uHas']) U[n] = gl.getUniformLocation(prog, n);
+const tex = gl.createTexture();
+gl.bindTexture(gl.TEXTURE_2D, tex);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+let source = null, aspect = 16 / 9, video = null;
+function upload() {
+  if (!source) return;
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+  gl.generateMipmap(gl.TEXTURE_2D);
+}
+const val = (id) => Number($(id).value);
+function draw() {
+  if (video && video.readyState >= 2) upload();
+  gl.viewport(0, 0, cv.width, cv.height);
+  gl.uniform1i(U.uImg, 0); gl.uniform2f(U.uRes, cv.width, cv.height);
+  gl.uniform1f(U.uW, val('width')); gl.uniform1f(U.uAspect, aspect); gl.uniform1f(U.uEl, val('elev'));
+  gl.uniform1f(U.uAz, val('az')); gl.uniform1f(U.uTilt, val('tilt')); gl.uniform1f(U.uCurved, val('shape'));
+  gl.uniform1f(U.uGuides, val('guides')); gl.uniform1f(U.uHas, source ? 1 : 0);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+function info() {
+  const w = val('width'), el = val('elev');
+  const h = val('shape') ? w / aspect : 2 * Math.atan(Math.tan(w * Math.PI / 360) / aspect) * 180 / Math.PI;
+  for (const id of ['width', 'elev', 'az', 'tilt']) $(id + 'v').textContent = $(id).value + '°';
+  const px = (n) => Math.round(w * n / 180);
+  $('info').innerHTML = `The screen is <b>${w}° × ${h.toFixed(1)}°</b> and spans <b>${(el - h / 2).toFixed(0)}°–${(el + h / 2).toFixed(0)}°</b> above eye level.` +
+    `<br>Your picture gets about <b>${px(2048)} px</b> across at 2K, <b>${px(4096)} px</b> at 4K.` +
+    (el - h / 2 < 15 || el + h / 2 > 60 || Math.abs(val('az')) + w / 2 > 60 ? '<br><span style="color:#ff7e4d">It leaves the comfortable zone.</span>' : '');
+}
+function loop() { draw(); requestAnimationFrame(loop); }
+document.querySelectorAll('input,select').forEach((e) => e.addEventListener('input', info));
+
+function setImage(img, w, h) { source = img; aspect = w / h; upload(); info(); }
+$('pick').addEventListener('change', (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  const url = URL.createObjectURL(f);
+  if (video) { video.pause(); video = null; }
+  if (f.type.startsWith('video')) {
+    video = document.createElement('video'); video.src = url; video.loop = true; video.muted = true; video.playsInline = true;
+    video.onloadeddata = () => { setImage(video, video.videoWidth, video.videoHeight); say('Video: ' + f.name); };
+    video.play().catch(() => say('Click anywhere to start the video.'));
+    document.addEventListener('click', () => video && video.play(), { once: true });
+  } else {
+    const img = new Image(); img.onload = () => { setImage(img, img.naturalWidth, img.naturalHeight); say('Image: ' + f.name); }; img.src = url;
+  }
+});
+function testCard() {
+  const c = document.createElement('canvas'); c.width = 1920; c.height = 1080; const g = c.getContext('2d');
+  g.fillStyle = '#10141c'; g.fillRect(0, 0, 1920, 1080);
+  g.strokeStyle = '#c8ccd4'; g.lineWidth = 3;
+  for (let i = 0; i <= 16; i++) { const x = i * 1919 / 16; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 1080); g.stroke(); }
+  for (let j = 0; j <= 9; j++) { const y = j * 1079 / 9; g.beginPath(); g.moveTo(0, y); g.lineTo(1920, y); g.stroke(); }
+  g.strokeStyle = '#ff7e4d'; g.lineWidth = 12; g.strokeRect(6, 6, 1908, 1068);
+  g.fillStyle = '#ffd34d'; g.beginPath(); g.arc(960, 540, 120, 0, 7); g.lineWidth = 8; g.strokeStyle = '#ffd34d'; g.stroke();
+  g.font = '700 110px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#f2f5fa';
+  g.fillText('STRAIGHT FROM THE SEATS', 960, 300); g.font = '400 60px system-ui, sans-serif'; g.fillStyle = '#8fa3be'; g.fillText('a 16:9 slide on a virtual screen', 960, 800);
+  if (video) { video.pause(); video = null; }
+  setImage(c, 1920, 1080); say('Test card loaded.');
+}
+$('test').onclick = testCard;
+
+$('png').onclick = () => {
+  const n = val('res'), keep = [cv.width, cv.height];
+  cv.width = cv.height = n; draw();
+  cv.toBlob((b) => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `dome_master_${n}.png`; a.click(); });
+  cv.width = keep[0]; cv.height = keep[1];
+};
+let rec = null;
+$('rec').onclick = () => {
+  if (rec) { rec.stop(); return; }
+  const n = Math.min(val('res'), 2048);
+  cv.width = cv.height = n;
+  const chunks = [];
+  rec = new MediaRecorder(cv.captureStream(30), { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 40e6 });
+  rec.ondataavailable = (e) => chunks.push(e.data);
+  rec.onstop = () => {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(chunks, { type: 'video/webm' })); a.download = `dome_master_${n}.webm`; a.click();
+    rec = null; cv.width = cv.height = 1024; $('rec').textContent = 'Record video (WebM, real time)';
+  };
+  if (video) { video.currentTime = 0; video.play(); }
+  rec.start(); $('rec').textContent = 'Stop recording';
+};
+testCard(); info(); loop();
+</script>
+</body>
+</html>

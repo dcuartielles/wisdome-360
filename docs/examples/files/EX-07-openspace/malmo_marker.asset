@@ -1,0 +1,95 @@
+-- =====================================================================
+-- EX-07  malmo_marker.asset   --   OpenSpace
+-- =====================================================================
+-- Adds one custom object to the scene: a labelled marker standing on Earth
+-- at Malmo, plus a plane you can put your own image on.
+--
+-- This is the smallest complete OpenSpace asset. Everything larger is the
+-- same three parts: require what you depend on, describe a node, add it on
+-- initialise and remove it on deinitialise.
+--
+-- Install
+--   1. Put this file (and your image) in
+--      <openspace>/data/assets/customization/
+--   2. Add it to your profile: in the OpenSpace Launcher, open your profile,
+--      Assets -> add "customization/malmo_marker".
+--   3. Launch. The marker appears in the scene tree as "Malmo Marker".
+--
+-- API NOTE: OpenSpace's Lua API moves between releases. If a call below is
+-- rejected, check the version you actually have at
+-- https://docs.openspaceproject.com  -- the SHAPE of an asset is stable even
+-- when individual function names are not.
+-- =====================================================================
+
+local earthAsset = asset.require("scene/solarsystem/planets/earth/earth")
+local sunAsset   = asset.require("scene/solarsystem/sun/sun")
+
+-- Put your own 1:1 image next to this file and name it here.
+local markerTexture = asset.resource({
+    Name = "Malmo Marker Texture",
+    Type = "HttpSynchronization",   -- swap for asset.localResource("marker.png")
+    Identifier = "malmo_marker_texture",
+    Version = 1
+})
+
+-- Malmo, Sweden
+local LAT  = 55.6050
+local LON  = 13.0038
+local ALT  = 0.0
+
+local MalmoMarker = {
+    Identifier = "MalmoMarker",
+    Parent = earthAsset.Earth.Identifier,
+
+    Transform = {
+        Translation = {
+            Type = "GlobeTranslation",
+            Globe = earthAsset.Earth.Identifier,
+            Latitude  = LAT,
+            Longitude = LON,
+            Altitude  = ALT,
+            UseHeightmap = true
+        },
+        Rotation = {
+            Type = "GlobeRotation",
+            Globe = earthAsset.Earth.Identifier,
+            Latitude  = LAT,
+            Longitude = LON
+        }
+    },
+
+    Renderable = {
+        Type = "RenderablePlaneImageLocal",
+        Size = 40000,                      -- metres. Large enough to see from orbit.
+        Origin = "Center",
+        Billboard = true,                  -- always faces the audience
+        Texture = markerTexture .. "marker.png",
+        BlendMode = "Additive",            -- additive keeps the dome dark
+        Opacity = 0.9
+    },
+
+    GUI = {
+        Name = "Malmo Marker",
+        Path = "/Course/Wisdome",
+        Description = "A marker over Malmo, for the EDT/TEI dome week."
+    }
+}
+
+asset.onInitialize(function()
+    openspace.addSceneGraphNode(MalmoMarker)
+end)
+
+asset.onDeinitialize(function()
+    openspace.removeSceneGraphNode(MalmoMarker)
+end)
+
+asset.export(MalmoMarker)
+
+asset.meta = {
+    Name        = "Malmo Marker",
+    Version     = "1.0",
+    Description = "Course example: a custom marker node on Earth at Malmo.",
+    Author      = "EDT / TEI, Malmo University",
+    URL         = "https://www.openspaceproject.com",
+    License     = "MIT"
+}

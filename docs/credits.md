@@ -20,7 +20,10 @@ Anything imported keeps **its own licence**. It is listed below with its source,
 | Material for MkDocs | Martin Donath, [squidfunk/mkdocs-material](https://github.com/squidfunk/mkdocs-material) | MIT | The theme of this site |
 | Atkinson Hyperlegible | Braille Institute, via Google Fonts | SIL Open Font License 1.1 | Body text of this site |
 | JetBrains Mono | JetBrains, via Google Fonts | SIL Open Font License 1.1 | Code on this site |
-| Poppins (Bold, Regular) | Indian Type Foundry | SIL Open Font License 1.1 | Letter outlines in the Wisdome 360 wordmark (the dome-master "o" and the layout are ours, CC BY-SA 4.0) |
+| Poppins (Bold, Regular) | Indian Type Foundry, [itfoundry/Poppins](https://github.com/itfoundry/Poppins) | SIL Open Font License 1.1 | Letter outlines in the Wisdome 360 wordmark (the dome-master "o" and the layout are ours, CC BY-SA 4.0). The font files are bundled with EX-09 Type size, with their licence (`Poppins-OFL.txt`) |
+| Inter (Thin, Light, Regular, Bold, Black) | The Inter Project Authors, [rsms/inter](https://github.com/rsms/inter) | SIL Open Font License 1.1 | Bundled with EX-09 Type size, with its licence (`Inter-OFL.txt`) |
+| Liberation Serif (Regular) | Google Corporation and Red Hat, [liberationfonts](https://github.com/liberationfonts/liberation-fonts) | SIL Open Font License 1.1 | Bundled with EX-09 Type size, with its licence (`LiberationSerif-OFL.txt`) |
+| p5.js 2.3.1 (`p5.min.js`) | The Processing Foundation and contributors, [processing/p5.js](https://github.com/processing/p5.js) | GNU LGPL 2.1 | Bundled with EX-04 Chorus, unmodified, so the sketch runs offline |
 
 ### Footage and media not published here
 
@@ -28,7 +31,7 @@ Some material used in the course can't be republished. We link to the source ins
 
 | Item | Author / source | Licence | Why it isn't here |
 |---|---|---|---|
-| "Flying Dove – Free Green screen Stock Footage" (used by EX-10 Flight) | [UltraKey](https://ultrakey.gumroad.com/l/flyingdove) | Free for non-commercial use with credit; paid licence for client or monetised work | Redistribution is not covered. Download it from UltraKey |
+| "Flying Dove – Free Green screen Stock Footage" (used by EX-10 Flight) | [UltraKey](https://ultrakey.gumroad.com/l/flyingdove) | Free for non-commercial use with credit; paid licence for client or monetised work | Redistribution is not covered, so neither the clip nor the films made from it are here. Download it from UltraKey. The EX-10 notebook runs on a test clip of its own without it |
 
 Readings for the MaU course are on Canvas, under the university's copyright licence.
 

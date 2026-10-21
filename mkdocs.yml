@@ -8,7 +8,7 @@ edit_uri: edit/main/docs/
 copyright: >-
   Text and media we made: <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a> ·
   Code: <a href="https://www.gnu.org/licenses/gpl-3.0.html">GPL-3.0</a> ·
-  Imported material keeps its own licence — see <a href="credits/">Credits</a>
+  Imported material keeps its own licence — see <a href="https://dcuartielles.github.io/wisdome-360/credits/">Credits</a>
 
 theme:
   name: material
@@ -53,6 +53,7 @@ extra_css:
 plugins:
   - search
   - mkdocs-jupyter:
+      include: ["*.ipynb"]      # .py files stay plain downloads
       execute: false
       include_source: true
 
@@ -91,6 +92,16 @@ nav:
       - Making a live piece: make/live.md
   - Examples:
       - examples/index.md
+      - EX-01 Drift (Blender): examples/ex01-drift.md
+      - EX-02 Tide (Python): examples/ex02-tide.ipynb
+      - EX-03 Pulse (WebGL): examples/ex03-pulse.md
+      - EX-04 Chorus (p5.js): examples/ex04-chorus.md
+      - EX-05 TouchDesigner: examples/ex05-touchdesigner.md
+      - EX-06 Unity: examples/ex06-unity.md
+      - EX-07 OpenSpace: examples/ex07-openspace.md
+      - EX-08 Flat to Dome: examples/ex08-flat-to-dome.ipynb
+      - EX-09 Type size: examples/ex09-type-size.ipynb
+      - EX-10 Flight: examples/ex10-flight.ipynb
   - Problems: problems.md
   - MaU course 2026:
       - course/index.md
