@@ -4,7 +4,7 @@ Course site for making work for the **Wisdome Malmö** dome with open tools: a o
 
 **Site:** https://dcuartielles.github.io/wisdome-360/
 
-Logistics, groups, readings and submission are on Canvas. This repository holds the technical material: how the dome works, the setup wizard, the Dome Simulator, workflows, examples, problems and the delivery spec.
+General material for anyone making work for the dome, plus a section for the 2026 MaU module. Course logistics, groups, readings and submission are on Canvas.
 
 ## Build the site locally
 
@@ -31,13 +31,15 @@ See `CLAUDE.md` for the rules.
 
 ```text
 docs/
-  index.md, week.md        Start here, the week day by day
+  index.md                 home (general)
+  reference/               the dome: where to put things, venue, connecting, delivery spec
   setup/                   setup page + wizard.html (standalone, no libraries)
   tools/                   dome-simulator.html (standalone, no libraries)
-  workflows/               Track A and Track B
+  make/                    making a film, making a live piece
   examples/                EX-01 … EX-10 (Python examples as notebooks, rendered by mkdocs-jupyter)
-  reference/               venue, where to put things
-  problems.md, delivery.md, changes.md, credits.md
+  problems.md              problems by symptom
+  course/                  MaU course 2026: start, the week, hand-in
+  changes.md, credits.md
 ```
 
 Large files (example videos, tool downloads) go on GitHub Releases, not in the repository.

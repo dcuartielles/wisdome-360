@@ -1,10 +1,10 @@
 ---
-title: Track A — a film
+title: Making a film
 ---
 
-# Track A: from idea to a film in the dome
+# Making a film for the dome
 
-You make a video. On Friday it is joined with every other Track A film into one reel and played from one machine. Nothing to plug in, nothing to crash.
+You make a video, and the dome plays it from its own system. Nothing to plug in, nothing to crash.
 
 ## 1. Choose a tool
 
@@ -30,7 +30,9 @@ Plan 5.1 or stereo early. Export one mono WAV per channel, 48 kHz / 16-bit, star
 
 ## 4. Final render
 
-1. Render the final master at **2048 × 2048, 30 fps** as a PNG sequence. Start it on Thursday at the latest.
-2. Encode with the line from the [delivery spec](../delivery.md#video) (60 Mbit/s CBR).
+1. Render the final master at **2048 × 2048, 30 fps** as a PNG sequence. At this size a few minutes of film takes hours, so start early.
+2. Encode with the line from the [delivery spec](../reference/delivery-spec.md#video) (60 Mbit/s CBR).
 3. Watch the encoded `.mp4` once, whole, in the simulator.
-4. Run the [delivery checklist](../delivery.md#checklist) and upload by **Friday 08:00**.
+4. Run the [delivery checklist](../reference/delivery-spec.md#checklist).
+
+MaU students: file names, deadline and upload are on [Hand-in](../course/hand-in.md).

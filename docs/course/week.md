@@ -18,9 +18,9 @@ The introductory lecture: how the dome works, who has made work for domes before
 **By the end of the day:**
 
 - [ ] Your group exists and has a name (it goes into your file names).
-- [ ] You have chosen **Track A** (a film) or **Track B** (live). See [Start here](index.md#two-tracks).
-- [ ] At least one laptop in the group has passed the [setup wizard](setup/wizard.html) and shows the test card in the [Dome Simulator](tools/dome-simulator.html).
-- [ ] You have opened one [example](examples/index.md) close to your idea and watched it in the simulator.
+- [ ] You have chosen **Track A** (a film) or **Track B** (live). See [Two tracks](index.md#two-tracks).
+- [ ] At least one laptop in the group has passed the [setup wizard](../setup/wizard.html) and shows the test card in the [Dome Simulator](../tools/dome-simulator.html).
+- [ ] You have opened one [example](../examples/index.md) close to your idea and watched it in the simulator.
 </div>
 
 <div class="w360-day" markdown>
@@ -32,10 +32,10 @@ Plan the piece as positions in the room, not as a picture: where the subject is 
 
 **By the end of the day:**
 
-- [ ] A storyboard in angles: what sits in the [comfortable zone](reference/comfortable-zone.md), what wraps around, what happens overhead.
+- [ ] A storyboard in angles: what sits in the [comfortable zone](../reference/comfortable-zone.md), what wraps around, what happens overhead.
 - [ ] A first test at low resolution (1024²) seen in the simulator from the reference seat **and** from the back row.
 - [ ] If you use text: checked against the type-size card (EX-09). Minimum 1.5° cap height, 3° for anything people must read.
-- [ ] A sound plan: 5.1 or stereo.
+- [ ] A sound plan: 5.1 or stereo. Track B: 5.1 needs the NDI + Dante route; HDMI carries stereo only.
 </div>
 
 <div class="w360-day session" markdown>
@@ -49,7 +49,7 @@ Plan the piece as positions in the room, not as a picture: where the subject is 
 
 - [ ] A rough version of the **whole** piece, start to finish, plays in the simulator.
 - [ ] You know how long it is (Track A: 90–180 s).
-- [ ] Track B: your laptop sends NDI to the simulator through the NDI bridge, or you know why not.
+- [ ] Track B: you have chosen your connection, **NDI + Dante** (5.1) or **HDMI** (stereo only), and tested it: NDI through the NDI bridge, HDMI through a capture card. See [Connecting a live piece](../reference/connecting.md).
 </div>
 
 <div class="w360-day" markdown>
@@ -63,7 +63,7 @@ Leave time for the final render: at 2048² a long piece takes hours, not minutes
 
 - [ ] Track A: the final 2048 × 2048, 30 fps master is rendering or rendered, and the audio WAVs are exported.
 - [ ] Track B: your fallback recording is made and meets the spec; `runbook.md` is written.
-- [ ] You have run the [delivery checklist](delivery.md#checklist) on your actual files.
+- [ ] You have run the [hand-in checklist](hand-in.md#checklist) on your actual files.
 </div>
 
 <div class="w360-day session" markdown>
@@ -75,7 +75,7 @@ Leave time for the final render: at 2048² a long piece takes hours, not minutes
 - **Morning:** dry run in the dome, in running order. Note what looks wrong; you can fix small things over lunch.
 - **Afternoon:** presentations. Three minutes per group to explain your decisions, in the dark, in the dome.
 
-Bring: Track B laptop, charger, two Ethernet adapters if your laptop has fewer than two ports, the fallback file on a USB stick.
+Track B, bring: laptop and charger; for NDI + Dante two Ethernet links (adapters if your laptop has fewer than two ports), for HDMI an HDMI cable and any adapter your laptop needs; the fallback file on a USB stick. See [Hand-in](hand-in.md#friday).
 </div>
 
 </div>

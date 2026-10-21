@@ -45,6 +45,8 @@ If the status says something is waiting, tell David in one or two lines what is 
 - Videos and anything over 95 MB go on **GitHub Releases**, not in the repository (`gh release upload`).
 - **Licences.** Text and media we made: CC BY-SA 4.0. Code: GPL-3.0. Anything imported keeps its own licence and must be listed in `docs/credits.md` (source, author, licence, link) before it is published. If an item's licence doesn't allow public redistribution (e.g. the EX-10 UltraKey dove clip), don't publish it: link to the source instead. If unsure, ask David.
 - Student-visible changes get a dated line in `docs/changes.md`, newest first.
+- **Keep general and course content apart.** Anything specific to the MaU 2026 module (dates, deadlines, Canvas, groups, tracks A/B, running order, file names for the reel) goes under `docs/course/`. Every other page must make sense to someone who isn't on the course; it may link to the course section in one line.
+- **Live connections:** a live piece uses either NDI video + Dante audio (two Ethernet links, 5.1) or HDMI for both picture and sound (stereo only). Never describe HDMI video with Dante audio.
 - Never add readings or other copyrighted PDFs: those live on Canvas only.
 - Never publish anything about individual students (names, groups' work, photos) without David's go-ahead.
 
@@ -62,13 +64,15 @@ Use the venv's Python for `scripts/preflight.py`, because it runs mkdocs. Versio
 ## Layout
 
 ```text
-docs/index.md, week.md       Start here, the week
-docs/setup/wizard.html       setup wizard (standalone HTML, no libraries)
+docs/index.md                general home page (no course details)
+docs/reference/              the dome: where to put things, venue, connecting a live piece, delivery spec
+docs/setup/                  set-up page + wizard.html (standalone HTML, no libraries)
 docs/tools/                  Dome Simulator (standalone HTML)
-docs/workflows/              Track A, Track B
+docs/make/                   making a film, making a live piece
 docs/examples/               examples (Python ones as .ipynb via mkdocs-jupyter)
-docs/reference/              venue, comfortable zone
-docs/problems.md, delivery.md, changes.md, credits.md
+docs/problems.md             problems by symptom
+docs/course/                 MaU course 2026 ONLY: start, the week, hand-in (deadlines, file names, Canvas)
+docs/changes.md, credits.md  about
 scripts/                     publish_status.py, preflight.py
 claude-setup/                hooks (settings.json) and /first-push, /publish: copied into .claude/
 .publish-queue.md            hand-off list from cloud sessions (git-ignored)

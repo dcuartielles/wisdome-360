@@ -20,6 +20,7 @@ Anything imported keeps **its own licence**. It is listed below with its source,
 | Material for MkDocs | Martin Donath, [squidfunk/mkdocs-material](https://github.com/squidfunk/mkdocs-material) | MIT | The theme of this site |
 | Atkinson Hyperlegible | Braille Institute, via Google Fonts | SIL Open Font License 1.1 | Body text of this site |
 | JetBrains Mono | JetBrains, via Google Fonts | SIL Open Font License 1.1 | Code on this site |
+| Poppins (Bold, Regular) | Indian Type Foundry | SIL Open Font License 1.1 | Letter outlines in the Wisdome 360 wordmark (the dome-master "o" and the layout are ours, CC BY-SA 4.0) |
 
 ### Footage and media not published here
 
@@ -29,8 +30,8 @@ Some material used in the course can't be republished. We link to the source ins
 |---|---|---|---|
 | "Flying Dove – Free Green screen Stock Footage" (used by EX-10 Flight) | [UltraKey](https://ultrakey.gumroad.com/l/flyingdove) | Free for non-commercial use with credit; paid licence for client or monetised work | Redistribution is not covered. Download it from UltraKey |
 
-Readings for the seminar are on Canvas, under the university's copyright licence.
+Readings for the MaU course are on Canvas, under the university's copyright licence.
 
 ## Something missing or wrong?
 
-If you find an item without a credit, or a credit that is wrong, tell us in the help-desk discussion on Canvas or open an issue on the [repository](https://github.com/dcuartielles/wisdome-360/issues).
+If you find an item without a credit, or a credit that is wrong, [open an issue](https://github.com/dcuartielles/wisdome-360/issues) (MaU students can also use the help-desk discussion on Canvas).

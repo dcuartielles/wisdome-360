@@ -66,6 +66,8 @@ def pending_entries():
 
 
 def main():
+    # Queue entries can hold characters like "→"; Windows consoles default to cp1252.
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     quiet = "--quiet" in sys.argv
     queue = pending_entries()
 

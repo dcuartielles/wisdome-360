@@ -1,5 +1,5 @@
 site_name: Wisdome 360
-site_description: Making work for the Wisdome Malmö dome with open tools — a one-week module for EDT 26 and TEI 26, Malmö University.
+site_description: Making work for the Wisdome Malmö dome with open tools. Includes the 2026 MaU module for EDT 26 and TEI 26.
 site_author: David Cuartielles
 site_url: https://dcuartielles.github.io/wisdome-360/
 repo_url: https://github.com/dcuartielles/wisdome-360
@@ -42,6 +42,8 @@ theme:
     - content.tabs.link
     - content.code.copy
     - content.action.edit
+  logo: assets/logo/wisdome360-mark-white.svg
+  favicon: assets/logo/favicon.svg
   icon:
     repo: fontawesome/brands/github
 
@@ -72,25 +74,28 @@ markdown_extensions:
   - pymdownx.inlinehilite
 
 nav:
-  - Start here:
-      - index.md
-      - The week: week.md
+  - Home: index.md
+  - The dome:
+      - reference/index.md
+      - Where to put things: reference/comfortable-zone.md
+      - The venue: reference/venue.md
+      - Connecting a live piece: reference/connecting.md
+      - Delivery spec: reference/delivery-spec.md
   - Set up:
       - setup/index.md
       - Setup wizard: setup/wizard.html
       - Dome Simulator: tools/dome-simulator.html
-  - Workflows:
-      - workflows/index.md
-      - Track A — a film: workflows/track-a.md
-      - Track B — live: workflows/track-b.md
+  - Make:
+      - make/index.md
+      - Making a film: make/film.md
+      - Making a live piece: make/live.md
   - Examples:
       - examples/index.md
   - Problems: problems.md
-  - Reference:
-      - reference/index.md
-      - The venue: reference/venue.md
-      - Where to put things: reference/comfortable-zone.md
-  - Delivery: delivery.md
+  - MaU course 2026:
+      - course/index.md
+      - The week: course/week.md
+      - Hand-in: course/hand-in.md
   - About:
       - What changed: changes.md
       - Credits and licences: credits.md

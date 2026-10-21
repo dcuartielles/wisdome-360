@@ -4,7 +4,7 @@ title: Problems
 
 # Problems and fixes
 
-Find your symptom. If it isn't here, ask in the help-desk discussion on Canvas. Answers that help get added to this page.
+Find your symptom. If it isn't here, MaU students ask in the help-desk discussion on Canvas; anyone else can [open an issue](https://github.com/dcuartielles/wisdome-360/issues). Answers that help get added to this page.
 
 ## Picture
 
@@ -36,3 +36,6 @@ Find your symptom. If it isn't here, ask in the help-desk discussion on Canvas. 
 
 ??? question "The NDI picture stutters or lags"
     Your laptop is doing too much at once. Run the NDI bridge with `--half`, and close other programs. The status bar shows frames in and out.
+
+??? question "My 5.1 sound comes out as stereo"
+    You are probably connected by HDMI. HDMI carries stereo only. For 5.1 the piece has to send its sound by Dante, with the picture by NDI: see [Connecting a live piece](reference/connecting.md). If you stay on HDMI, make a stereo mix.
