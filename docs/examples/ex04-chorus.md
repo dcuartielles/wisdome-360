@@ -37,11 +37,11 @@ Inside, `roomXY` does two small steps:
 ```js
 function roomXY(azDeg, elDeg) {
   const d = roomToDome(azDeg, elDeg);        // tilt the audience's angles into the dome's
-  return d ? domeXY(d[0], d[1]) : null;      // null = below the dome's rim
+  return d ? domeXY(d[0], d[1]) : null;      // null = outside the master's circle
 }
 function domeXY(azDeg, elevDeg) {            // dome angles -> equidistant fisheye
   const c = RES / 2;
-  const r = (1 - constrain(elevDeg, 0, 90) / 90) * c;   // linear in angle
+  const r = constrain(90 - elevDeg, 0, FOV / 2) / (FOV / 2) * c;   // linear in angle from the zenith
   const a = radians(azDeg);
   return [c + r * sin(a), c + r * cos(a)];              // az 0 -> bottom = front
 }
@@ -49,9 +49,13 @@ function domeXY(azDeg, elevDeg) {            // dome angles -> equidistant fishe
 
 Two steps because the centre of a dome master is the **dome's** zenith, and Wisdome Malmö is tilted 26°, raised at the back: that zenith is 64° up, in front of the audience. `roomToDome` deals with it, and nothing else in the sketch has to know.
 
+`FOV = 160`, not 180: Wisdome's player spreads the *whole* circle of the master over its 160° screen, so the edge of the canvas is 80° from the centre. Draw a 180° master and everything lands squeezed towards the centre by 8/9.
+
 ## Where things go
 
-Press ++g++. The comfortable zone is a patch *in front*: 15°–60° above eye level, ±60° either side. The sweet spot is straight ahead, 40° up. See [Where to put things](../reference/comfortable-zone.md).
+Press ++g++. The comfortable zone is a patch *in front*: from the rim at the front (about −16°) up to about 45° above eye level, ±60° either side. The sweet spot is straight ahead, about 20° up. Neither is a ring round the centre of the image.
+
+Both come from the venue's own scale. Wisdome counts angles **in the image**: 0 at the rim, 90 at the centre, and their sweet spot is "40". Straight ahead that is `SWEET_EL = (90 - TILT) - (1 - SWEET_VENUE / 90) * FOV / 2` ≈ 19.6°, and the zone runs from the rim at the front (`(90 - TILT) - FOV / 2`, about −16°) to `SWEET_EL + 25` (about 45°). See [Where to put things](../reference/comfortable-zone.md).
 
 Chorus has two kinds of voice. Six warm **lead** voices are the subject: they are born inside the zone and turn back at its edge, so they stay in front. Four quiet blue **ambient** voices circle the whole room, higher up. Click inside the zone to add a lead voice, anywhere else for an ambient one.
 
@@ -91,7 +95,7 @@ Everything is decided in `newVoice()`. Try these, pressing ++g++ each time:
 
 1. Give the lead voices an elevation of `random(60, 85)`. The subject is now over everyone's heads and the piece goes dead.
 2. Give them an azimuth of `random(-180, 180)`. Half of them end up behind the audience, where nobody sees them.
-3. Put one lead voice at `newVoice(true, 0, 40)` with `speed: 0`: a subject sitting in the sweet spot.
+3. Put one lead voice at `newVoice(true, 0, SWEET_EL)` with `speed: 0`: a subject sitting in the sweet spot.
 
 Five minutes of this teaches more than this page.
 
@@ -102,4 +106,4 @@ Five minutes of this teaches more than this page.
 | A blank page | `vendor/p5.min.js` isn't next to `chorus.html`, in a folder called `vendor` |
 | Lines cut straight across the dome | `line()` used instead of `roomArc()` / `roomPath()` |
 | The film plays at half the speed of the sketch | Speeds are in degrees **per frame**, and p5 draws at 60 fps by default, while the film plays at 30. Add `frameRate(30)` in `setup()` so the sketch looks like the film |
-| Things vanish near the bottom of the circle | `roomXY` returns `null` below the dome's rim. Check for it before you draw |
+| Things vanish near the bottom of the circle | `roomXY` returns `null` outside the master's circle (below about −16° at the front). Check for it before you draw |

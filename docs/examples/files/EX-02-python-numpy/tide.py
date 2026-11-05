@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-EX-02  "TIDE"  --  a pre-rendered dome master written from scratch in Python.
+EX-02  "TIDE"  --  a Track A dome master written from scratch in Python.
 =========================================================================
     python3 tide.py            # renders PNG frames, then encodes an mp4
 
@@ -13,8 +13,9 @@ example is the IDEA, not the tool:
 
 Everything a dome cares about becomes easy in those coordinates:
   * "put the subject where people can comfortably see it" is a box:
-        -60 <= azimuth <= 60  and  15 <= elevation <= 60   (in FRONT)
-    with the sweet spot straight ahead at azimuth 0, elevation 40
+        -BAND_AZ <= azimuth <= BAND_AZ  and  BAND[0] <= elevation <= BAND[1]
+    (about +-60 and from the rim, -16, to 45, in FRONT), with the sweet spot straight ahead at
+    azimuth 0, elevation SWEET_EL (about 20)
   * "put it at the front of the room" is azimuth 0
   * "sweep it around the audience" is adding to azimuth over time
   * "no roll" is simply never rotating the image
@@ -31,13 +32,22 @@ import numpy as np, os, subprocess, math
 from PIL import Image
 
 # --------------------------------------------------------------- settings
-RES     = 2048          # the delivery size; 1024 while you design
+RES     = 2048          # 4096 for final delivery; 1024 while you design
 FRAMES  = 600           # 600 @ 30 fps = 20 s
 FPS     = 30
 OUTDIR  = "frames"
 MP4     = "EX-02_tide_%dx%d_30fps.mp4" % (RES, RES)
 
 TILT    = 26.0          # dome tilt in degrees, back raised (Wisdome Malmo)
+FOV     = 160.0         # the venue spreads the whole master over its 160° screen; a 180° file would be squeezed
+
+# Where to put things. The venue counts angles IN THE IMAGE: 0 at the rim,
+# 90 at the centre. Straight ahead, their angle a is at elevation
+#     (90 - TILT) - (1 - a/90) * FOV/2
+SWEET_VENUE = 40.0                                          # their sweet spot, on THEIR scale
+SWEET_EL = (90 - TILT) - (1 - SWEET_VENUE / 90) * FOV / 2   # ...above eye level: about 19.6 deg
+BAND     = ((90 - TILT) - FOV / 2, SWEET_EL + 25)   # comfortable zone, elevation: from the rim at the front (-16) up to about 45
+BAND_AZ  = 60.0                             # ...and this many degrees either side of the front
 
 # The (azimuth, elevation) canvas, in the AUDIENCE's angles. Width covers
 # 360 deg; height covers -30..90 deg, because at the front of a tilted dome
@@ -119,7 +129,7 @@ def to_fisheye(eq, n):
 
     In the dome master:
       centre of the circle = the DOME's zenith, edge = the dome's rim,
-      radius is LINEAR in angle from the dome's zenith (180 deg across),
+      radius is LINEAR in angle from the dome's zenith (FOV = 160 deg across),
       the front of the room is at the BOTTOM of the image.
     Because the dome is tilted, its zenith is not overhead: it is
     90 - TILT = 64 deg up, in front of the audience. So each master pixel
@@ -131,7 +141,7 @@ def to_fisheye(eq, n):
     dx, dy = xx - c, yy - c
     r = np.sqrt(dx * dx + dy * dy) / (n / 2.0)
     inside = r <= 1.0
-    th = np.radians(90.0) * np.clip(r, 0, 1)        # angle from the dome's zenith
+    th = np.radians(FOV / 2) * np.clip(r, 0, 1)     # angle from the dome's zenith
     a = np.arctan2(dx, dy)                          # 0 = bottom = front
     lx, ly, lz = np.sin(th) * np.sin(a), np.sin(th) * np.cos(a), np.cos(th)
     ct, st = math.cos(math.radians(TILT)), math.sin(math.radians(TILT))
@@ -151,8 +161,9 @@ def to_fisheye(eq, n):
 
 # ------------------------------------------------------------- the picture
 # Ribbons are AMBIENCE: they wrap the whole dome. The two warm ones run
-# through the comfortable zone in front (15-60 deg up); a subject would go
-# there too, near the 40 deg sweet spot.
+# through the comfortable zone in front (BAND, about 0-45 deg up), either side
+# of the sweet spot (SWEET_EL, about 20 deg up); a subject would go there too.
+# The high magenta one is overhead ambience.
 BANDS = [
     # Each row is one ribbon of light. Tune these first.
     #
@@ -164,11 +175,11 @@ BANDS = [
     # the way round. That is a lot of travel and still gentle, because the
     # ribbons move independently instead of the whole world turning as one
     # rigid thing, which is what actually makes people ill.
-    (46.0,  7.0,  3,   6.0,  2.6,  (1.00, 0.34, 0.10),  0.95,  5.0, 0.30),
-    (34.0,  9.0,  5,  -4.5,  2.0,  (1.00, 0.62, 0.18),  0.80,  4.0, 0.22),
-    (26.0,  5.0,  2,   8.0,  3.4,  (0.20, 0.45, 1.00),  0.85,  6.0, 0.17),
-    (19.0,  4.0,  7,  -3.0,  1.5,  (0.55, 0.85, 1.00),  0.55,  3.0, 0.41),
-    (55.0,  6.0,  4,   2.5,  1.8,  (0.85, 0.30, 0.65),  0.45,  4.5, 0.26),
+    (30.0,  7.0,  3,   6.0,  2.6,  (1.00, 0.34, 0.10),  0.95,  5.0, 0.30),
+    (20.0,  9.0,  5,  -4.5,  2.0,  (1.00, 0.62, 0.18),  0.80,  4.0, 0.22),
+    (12.0,  5.0,  2,   8.0,  3.4,  (0.20, 0.45, 1.00),  0.85,  6.0, 0.17),
+    ( 5.0,  4.0,  7,  -3.0,  1.5,  (0.55, 0.85, 1.00),  0.55,  3.0, 0.41),
+    (40.0,  6.0,  4,   2.5,  1.8,  (0.85, 0.30, 0.65),  0.45,  4.5, 0.26),
 ]
 
 STARS = stars()
@@ -176,7 +187,7 @@ STARS = stars()
 def frame(t):
     eq = np.zeros((H_EQ, W_EQ, 3), np.float32)
     eq += STARS
-    eq += horizon_glow(t, 22.0, (0.30, 0.16, 0.45), 0.34)
+    eq += horizon_glow(t, 12.0, (0.30, 0.16, 0.45), 0.34)
     for (e0, amp, lob, spd, th, col, g, rise, rate) in BANDS:
         # each ribbon breathes on its own clock, so they fall in and out of
         # step instead of pulsing together like a metronome

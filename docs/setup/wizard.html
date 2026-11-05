@@ -107,12 +107,8 @@ footer{color:var(--muted);font-size:13px;max-width:820px;margin:0 auto;padding:0
          {v:'webgl', t:'WebGL / shaders', d:'One HTML file · EX-03'},
          {v:'p5', t:'p5.js', d:'Live in the browser · EX-04'},
          {v:'openspace', t:'OpenSpace', d:'Fly through space · EX-07'}]}},
-    {id:'conn', title:'How will you connect in the dome?', hint:'One route carries both picture and sound. You can decide later.', type:'one', showIf:function(){ return S.a.track === 'B'; }, opts:[
-      {v:'ndi', t:'NDI + Dante', d:'Two Ethernet links · 5.1 sound'},
-      {v:'hdmi', t:'HDMI', d:'One cable · stereo sound only'},
-      {v:'undecided', t:'Not decided yet', d:'Show me both'}]},
     {id:'hw', title:'What else do you have?', hint:'Tick everything that applies, or nothing.', type:'many', opts:[
-      {v:'capture', t:'USB HDMI capture card', d:'Test a real second display, or the HDMI route'},
+      {v:'capture', t:'USB HDMI capture card', d:'Rehearse the real HDMI picture'},
       {v:'quest', t:'A Meta Quest 3', d:'Look around a preview in VR'}]},
     {id:'mau', title:'Are you on the MaU module (EDT 26 / TEI 26)?', hint:'Adds the course deadlines and where to ask for help.', type:'one', opts:[
       {v:'yes', t:'Yes'}, {v:'no', t:'No'}]}
@@ -171,7 +167,7 @@ footer{color:var(--muted);font-size:13px;max-width:820px;margin:0 auto;padding:0
 
   var TOOL = {
     blender:{name:'Blender', ex:'EX-01 Drift', install:{all:'<p>Download Blender from <a href="https://www.blender.org/download/">blender.org</a> (free). Any recent version works; EX-01 was made with Blender 5.</p>'},
-      setup:'<p>Set up the camera like the venue:</p><ol><li>Render engine <b>Cycles</b> (EEVEE cannot render a fisheye).</li><li>Camera → Lens → Type <b>Panoramic</b>, Panorama Type <b>Fisheye Equidistant</b>, Field of View <b>180°</b>.</li><li>Rotate the camera <b>154°</b> about X (that is 180° − 26°, the dome tilt).</li><li>Output 1024 × 1024 while you design.</li></ol>'},
+      setup:'<p>Set up the camera like the venue:</p><ol><li>Render engine <b>Cycles</b> (EEVEE cannot render a fisheye).</li><li>Camera → Lens → Type <b>Panoramic</b>, Panorama Type <b>Fisheye Equidistant</b>, Field of View <b>160°</b> (not 180°: the venue spreads the whole circle over its 160° screen).</li><li>Rotate the camera <b>154°</b> about X (that is 180° − 26°, the dome tilt).</li><li>Output 1024 × 1024 while you design.</li></ol>'},
     python:{name:'Python', ex:'EX-02 Tide', install:{
       win:'<p>Install Python 3.10 or newer from <a href="https://www.python.org/downloads/">python.org</a> (tick “Add to PATH”). Then in a terminal: <code>pip install numpy pillow</code>. For video: <code>winget install Gyan.FFmpeg</code>.</p>',
       mac:'<p>Install Python 3.10 or newer (<code>brew install python</code> or <a href="https://www.python.org/downloads/">python.org</a>). Then <code>pip3 install numpy pillow</code> and <code>brew install ffmpeg</code>.</p>',
@@ -191,7 +187,7 @@ footer{color:var(--muted);font-size:13px;max-width:820px;margin:0 auto;padding:0
       mac:'<p>Download TouchDesigner from <a href="https://derivative.ca/download">derivative.ca</a> and register a licence.</p>',
       linux:'<p class="warn">TouchDesigner runs on Windows and macOS only. Use a group member\'s Windows or Mac laptop, or pick another tool.</p>'},
       warn:'The free Non-Commercial licence limits output to 1280 × 1280. Design at 1024² and plan for a licence if you need 2048².',
-      setup:'<p>Follow the recipe in EX-05: a fisheye render, then a Null TOP. Rotate X = 64 so the camera leans like the dome. The two GLSL TOPs in EX-05 draw the comfortable zone and convert 360 footage.</p>'},
+      setup:'<p>Follow the recipe in EX-05: a fisheye render with <b>FOV Angle 160</b>, then a Null TOP. Rotate X = 64 so the camera leans like the dome. The two GLSL TOPs in EX-05 draw the comfortable zone and convert 360 footage.</p>'},
     unity:{name:'Unity', ex:'EX-06', install:{all:'<p>Install <a href="https://unity.com/download">Unity Hub</a> and a Unity editor with a free Personal licence. EX-06 explains which dome package it uses and how to add it.</p>'},
       setup:'<p>Set up the dome camera rig as in EX-06 at 2048 × 2048. Place objects with <code>DomePlacement.cs</code> by azimuth and elevation, not by coordinates.</p>'},
     webgl:{name:'WebGL', ex:'EX-03 Pulse', install:{all:'<p>Nothing to install. Open <code>pulse.html</code> from EX-03 in Chrome or Edge, in its own window.</p>'},
@@ -202,8 +198,6 @@ footer{color:var(--muted);font-size:13px;max-width:820px;margin:0 auto;padding:0
 
   function stages(){
     var tr = S.a.track, tool = TOOL[S.a.tool], live = tr === 'B', mau = S.a.mau === 'yes';
-    var conn = live ? (S.a.conn || 'undecided') : null;
-    var ndi = conn === 'ndi' || conn === 'undecided', hdmi = conn === 'hdmi' || conn === 'undecided';
     var SPEC = '../reference/delivery-spec/', CONN = '../reference/connecting/';
     var st = [];
 
@@ -234,23 +228,18 @@ footer{color:var(--muted);font-size:13px;max-width:820px;margin:0 auto;padding:0
         win:'<p>Gives Windows a second, invisible 2048 × 2048 screen. From the Releases page download <b>virtual-monitor-windows</b>, then run <code>install-dome-monitor.bat</code> once and <code>dome-monitor-on.bat</code> (both ask for administrator rights). Put your piece fullscreen on the new screen and share <b>that screen</b> in the simulator. <code>dome-monitor-off.bat</code> switches it off; <code>uninstall-dome-monitor.bat</code> removes the driver.</p><p class="warn">This installs a signed display driver. Use it on your own laptop, not a university machine.</p>',
         mac:'<p>Install <a href="https://github.com/Stengo/DeskPad">DeskPad</a> (free) or BetterDisplay. DeskPad has no square mode: choose 2560 × 1440, put your dome master in the middle, and the simulator crops the centre square. Then share that display.</p>',
         linux:'<p>On X11: from the Releases page download <b>virtual-monitor-linux</b> and run <code>./dome-monitor.sh on</code>, then <code>./dome-monitor.sh move</code> and click your window to put it on the new screen. <code>./dome-monitor.sh off</code> removes it. On GNOME Wayland, log in to “GNOME on Xorg” first.</p>'}), go:[REL,'Releases page']});
-      if (ndi) r.push({id:'b-ndi', t:'NDI + Dante route: send NDI into the simulator', d:'<p>From the Releases page download <b>ndi-bridge</b>. Run <code>start-test-sender</code> first, then <code>start-ndi-bridge</code>: the first run sets itself up (it needs Python 3.10+) and opens the simulator. Pick the source next to <b>NDI…</b>. The status bar should say about 30 of 30 fps.</p>'
-        + '<p>Then send NDI from your own tool instead of the test sender'+({td:' (an <b>NDI Out TOP</b> after your Null TOP)', unity:' (enable NDI on the dome camera rig, see EX-06)'}[S.a.tool] || ' (the screen-capture tool in NDI Tools works for browser pieces)')+'.</p>'
-        + '<p>On eduroam NDI can\'t find other computers. Use <code>--ips</code> with the other computer\'s address, or put both on a phone hotspot.</p>', go:[REL,'Releases page']});
-      if (hdmi || has('capture')) r.push({id:'b-hdmi', t:'HDMI route: look through a capture card', d:'<p>Laptop HDMI → USB capture card → the computer running the simulator. Your laptop now sees a second display, as it will see the dome. Put your dome master fullscreen on it. In the simulator: <b>Camera / capture card</b> → pick the card → <b>Start device</b>. The dome\'s HDMI input takes 16:9, so set this display to 1920 × 1080 (or 3840 × 2160) and centre the square master with black at the sides; the simulator crops the middle square.</p>'
-        + (has('capture') ? '' : '<p class="warn">You need a USB HDMI capture card for this. Borrow one or buy a cheap one.</p>')});
+      r.push({id:'b-hdmi', t:'Look at your HDMI picture through a capture card', d:'<p>The dome takes your picture over <b>HDMI at 3840 × 2160</b>, with the dome master centred as a 2160 × 2160 square and black at the sides. Rehearse exactly that: laptop HDMI → USB capture card → the computer running the simulator. Set that display to 3840 × 2160 and put your piece fullscreen on it, centred (the easiest way is OBS with a Fullscreen Projector, see the Connecting page). In the simulator: <b>Camera / capture card</b> → pick the card → <b>Start device</b>; it crops the middle square.</p>'
+        + (has('capture') ? '' : '<p class="warn">You need a USB HDMI capture card for this. Borrow one or buy a cheap one. Until then, share the OBS projector window in the simulator instead.</p>'), go:[CONN+'#the-picture-hdmi','Connecting: the picture']});
     }
     if (has('quest')) r.push({id:'hw-quest', t:'Look around in the Quest', d:'<p>The Quest is a preview tool, not the deliverable: a dome piece is not a VR piece. The Quest dome viewer and its guide will be linked from this site; until then, use the simulator.</p>'});
     st.push({t: live ? 'Get your live output into the simulator' : 'See your own frames in the dome', steps:r});
 
     var v = [];
     if (live){
-      if (conn === 'undecided') v.push({id:'v-choose', t:'Choose your connection', d:'<p><b>NDI + Dante</b>: two Ethernet links, sound in 5.1. <b>HDMI</b>: one cable for picture and sound, stereo only. One route carries both; you can\'t mix them.</p>', go:[CONN,'Connecting a live piece']});
-      if (ndi) {
-        v.push({id:'v-eth', t:'NDI + Dante: two Ethernet links', d:'<p>One link for NDI (picture), one for Dante (sound). Get USB-Ethernet adapters if your laptop has fewer than two ports, and label which is which.</p>'});
-        v.push({id:'v-dante', t:'NDI + Dante: a way to send Dante', d:'<p>Six channels in 5.1 (L R C LFE Ls Rs). A laptop needs <b>Dante Virtual Soundcard</b>, which is paid software, or a hardware Dante interface. '+(mau ? '<b>Ask on Canvas before you buy a licence.</b>' : 'Sort this out early.')+'</p>'});
-      }
-      if (hdmi) v.push({id:'v-hdmi', t:'HDMI: cable, adapter and a stereo mix', d:'<p>Bring an HDMI cable and whatever adapter your laptop needs. HDMI carries <b>stereo only</b>: if your sound is in 5.1, make a stereo mix.</p>'});
+      v.push({id:'v-hdmi', t:'Picture: an HDMI cable at 3840 × 2160', d:'<p>Bring an HDMI cable and whatever adapter your laptop needs. Check in your display settings that the HDMI output really runs at <b>3840 × 2160</b>: some adapters drop to 1080p, which halves the detail on the dome.</p>'});
+      v.push({id:'v-dante', t:'Sound: a way to send Dante', d:'<p>Six channels in 5.1 (L R C LFE Ls Rs) over an Ethernet cable. '+(mau ? 'Use <b>Dante Virtual Soundcard</b> on your laptop or the <b>course\'s Dante box</b>. Ask on Canvas before you buy a licence.' : 'A laptop needs <b>Dante Virtual Soundcard</b> (paid software) or a hardware Dante interface. Sort this out early.')+' Bring an Ethernet port or a USB-Ethernet adapter.</p>', go:[CONN+'#the-sound-dante','Connecting: the sound']});
+      v.push({id:'v-sync', t:'Check picture and sound line up', d:'<p>They travel by different cables, so they can drift apart. In the room, play a flash and a click together and watch from the seats. Delay the sound or the picture in your piece if needed.</p>'});
+      v.push({id:'v-stereo', t:'Keep a stereo mix ready', d:'<p>If Dante fails on the day, the HDMI cable can carry the sound, but only in <b>stereo</b>. Have a stereo mix and know how to switch your output to the HDMI sound device.</p>'});
       v.push({id:'v-runbook', t:'Write runbook.md', d:'<p>How a stranger starts your system in under two minutes: what to plug in, what to launch, in which order.</p>'});
       v.push({id:'v-fallback', t:'Record the fallback', d:'<p>Record your piece running and convert it to the delivery spec. '+(mau ? 'Hand it in by <b>Friday 08:00</b>. No fallback, no live slot.' : 'If the laptop fails, the recording plays.')+'</p>', go:[mau ? '../course/hand-in/' : SPEC, mau ? 'Hand-in' : 'Delivery spec']});
     } else {
@@ -266,7 +255,6 @@ footer{color:var(--muted);font-size:13px;max-width:820px;margin:0 auto;padding:0
     st.forEach(function(s){ s.steps.forEach(function(x){ all.push(x.id); }); });
     var labels = {A:'Film', B:'Live', win:'Windows', mac:'macOS', linux:'Linux'};
     var hw = (S.a.hw||[]).map(function(h){ return {capture:'capture card', quest:'Quest 3'}[h]; }).filter(Boolean);
-    if (S.a.track === 'B') hw.unshift({ndi:'NDI + Dante', hdmi:'HDMI', undecided:'connection undecided'}[S.a.conn || 'undecided']);
     if (S.a.mau === 'yes') hw.push('MaU 2026');
     var h = '<div class="summary"><div class="chips">'
       + [labels[S.a.track], labels[S.a.os], TOOL[S.a.tool].name].concat(hw).map(function(c){ return '<span class="chip">'+c+'</span>'; }).join('')

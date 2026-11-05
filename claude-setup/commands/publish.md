@@ -8,7 +8,7 @@ Publish the waiting changes to the site. Stop at the first failure and say what 
 2. **Sync first.** `git pull --ff-only`. If it can't fast-forward, stop and explain: someone pushed from elsewhere, and David decides how to merge.
 3. **Look at the changes.** Briefly list what changed. Flag anything that breaks the rules in CLAUDE.md: imported media without a credit, a video or a large file, a PDF reading, anything naming students.
 4. **Preflight.** Run `python scripts/preflight.py` with the venv's Python. If it fails, stop. Show any warnings to David.
-5. **What changed page.** If students would notice the change and `docs/changes.md` has no entry for it, add a dated line (newest first, plain language).
+5. **What changed page.** If students would notice the change and `docs/changes.md` has no entry for it, add a line in the top `## vX.Y.Z — not released yet` section, under today's date (`### YYYY-MM-DD`, newest first, plain language). Publishing does not make a release; `/release` does, when David asks.
 6. **Confirm.** Show David the commit message you will use (one summary line plus a bullet per queued entry) and wait for a yes, unless he has already said "publish" for exactly these changes in this session.
 7. **Commit and push:** `git add -A`, `git commit`, `git push`. Never force-push.
 8. **Watch the deploy.** `gh run list --limit 1`, then `gh run watch <id> --exit-status`. On failure, show `gh run view <id> --log-failed` and report.

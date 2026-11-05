@@ -31,7 +31,7 @@
 <aside>
   <div class="card">
     <h1>Flat to Dome</h1>
-    <p>Puts a flat picture or video on a <b>virtual screen</b> in front of the audience and photographs it with the dome's fisheye — so it looks <b>flat and straight</b> from the seats. Wisdome Malmö: tilted 26°, sweet spot 40° up.</p>
+    <p>Puts a flat picture or video on a <b>virtual screen</b> in front of the audience and photographs it with the dome's fisheye — so it looks <b>flat and straight</b> from the seats. Wisdome Malmö: tilted 26°, 160° screen, sweet spot about 20° up (the venue's “40”).</p>
     <label class="btn" for="pick">Choose image or video…</label>
     <input id="pick" type="file" accept="image/*,video/*">
     <button id="test">Test card (16:9 grid)</button>
@@ -39,7 +39,7 @@
   </div>
   <div class="card">
     <div class="row"><span>Screen width</span><input id="width" type="range" min="10" max="150" step="1" value="60"><output id="widthv"></output></div>
-    <div class="row"><span>Height of centre</span><input id="elev" type="range" min="5" max="70" step="0.5" value="40"><output id="elevv"></output></div>
+    <div class="row"><span>Height of centre</span><input id="elev" type="range" min="5" max="70" step="0.1" value="19.6"><output id="elevv"></output></div>
     <div class="row"><span>Left / right</span><input id="az" type="range" min="-90" max="90" step="1" value="0"><output id="azv"></output></div>
     <div class="row"><span>Dome tilt</span><input id="tilt" type="range" min="0" max="30" step="1" value="26"><output id="tiltv"></output></div>
     <select id="shape"><option value="0">Flat screen</option><option value="1">Curved screen (wraps round the audience)</option></select>
@@ -62,13 +62,18 @@ uniform sampler2D uImg;
 uniform vec2 uRes;
 uniform float uW, uAspect, uEl, uAz, uTilt, uCurved, uGuides, uHas;
 const float PI = 3.14159265359, DEG = PI / 180.0;
+const float FOV = 160.0;          // the venue spreads the whole master over its 160 deg screen; a 180 deg file would be squeezed
+// The venue counts angles IN THE IMAGE: 0 at the rim, 90 at the centre. Straight ahead,
+// their angle a is at elevation (90 - tilt) - (1 - a/90) * FOV/2.
+const float SWEET_VENUE = 40.0;   // their sweet spot, on THEIR scale (about 19.6 deg up at tilt 26)
+const float BAND_ABOVE = 25.0, BAND_AZ = 60.0;   // comfortable zone: from the rim at the front up to sweet spot + 25
 float line(float d, float w){ float f = fwidth(d); return 1.0 - smoothstep(w * 0.5 - f, w * 0.5 + f, abs(d)); }
 void main(){
   vec2 p = gl_FragCoord.xy / uRes * 2.0 - 1.0; p.y = -p.y;          // image coords: y down
   float r = length(p);
   if (r > 1.0) { frag = vec4(0.0, 0.0, 0.0, 1.0); return; }
-  // 1. master pixel -> dome direction (equidistant fisheye, 180 deg, front at the bottom)
-  float th = r * PI * 0.5, a = atan(p.x, p.y);
+  // 1. master pixel -> dome direction (equidistant fisheye, FOV = 160 deg, front at the bottom)
+  float th = r * FOV * 0.5 * DEG, a = atan(p.x, p.y);
   vec3 l = vec3(sin(th) * sin(a), sin(th) * cos(a), cos(th));
   // 2. dome -> room (x right, y front, z up)
   float ct = cos(uTilt * DEG), st = sin(uTilt * DEG);
@@ -87,9 +92,10 @@ void main(){
   if (all(greaterThanEqual(uv, vec2(0.0))) && all(lessThanEqual(uv, vec2(1.0)))) c = uHas > 0.5 ? texture(uImg, uv).rgb : vec3(0.1);
   if (uGuides > 0.5) {
     float el = asin(clamp(d.z, -1.0, 1.0)) / DEG, az = atan(d.x, d.y) / DEG, aaz = abs(az);
-    float edge = max(max(line(el - 15.0, 0.4), line(el - 60.0, 0.4)) * step(aaz, 60.0), line((aaz - 60.0) * cos(el * DEG), 0.4) * step(15.0, el) * step(el, 60.0));
+    float sw = (90.0 - uTilt) - (1.0 - SWEET_VENUE / 90.0) * FOV * 0.5, lo = (90.0 - uTilt) - FOV * 0.5, hi = sw + BAND_ABOVE;
+    float edge = max(max(line(el - lo, 0.4), line(el - hi, 0.4)) * step(aaz, BAND_AZ), line((aaz - BAND_AZ) * cos(el * DEG), 0.4) * step(lo, el) * step(el, hi));
     c = mix(c, vec3(0.35, 0.95, 0.55), edge * 0.8);
-    float s = acos(clamp(dot(d, vec3(0.0, cos(40.0 * DEG), sin(40.0 * DEG))), -1.0, 1.0)) / DEG;
+    float s = acos(clamp(dot(d, vec3(0.0, cos(sw * DEG), sin(sw * DEG))), -1.0, 1.0)) / DEG;
     c = mix(c, vec3(1.0, 0.85, 0.3), line(s - 12.0, 0.5) * 0.8);
     c = mix(c, vec3(1.0, 0.4, 0.25), line(el, 0.4) * 0.5);          // eye level
   }
@@ -125,6 +131,9 @@ function upload() {
   gl.generateMipmap(gl.TEXTURE_2D);
 }
 const val = (id) => Number($(id).value);
+// same numbers as the shader: FOV of the master, and the venue's sweet spot / comfortable zone
+const FOV = 160, SWEET_VENUE = 40, BAND_ABOVE = 25, BAND_AZ = 60;
+const sweetEl = (tilt) => (90 - tilt) - (1 - SWEET_VENUE / 90) * FOV / 2;   // about 19.6 at tilt 26
 function draw() {
   if (video && video.readyState >= 2) upload();
   gl.viewport(0, 0, cv.width, cv.height);
@@ -138,10 +147,11 @@ function info() {
   const w = val('width'), el = val('elev');
   const h = val('shape') ? w / aspect : 2 * Math.atan(Math.tan(w * Math.PI / 360) / aspect) * 180 / Math.PI;
   for (const id of ['width', 'elev', 'az', 'tilt']) $(id + 'v').textContent = $(id).value + '°';
-  const px = (n) => Math.round(w * n / 180);
+  const px = (n) => Math.round(w * n / FOV);                    // n pixels span FOV degrees
+  const lo = (90 - val('tilt')) - FOV / 2, hi = sweetEl(val('tilt')) + BAND_ABOVE;
   $('info').innerHTML = `The screen is <b>${w}° × ${h.toFixed(1)}°</b> and spans <b>${(el - h / 2).toFixed(0)}°–${(el + h / 2).toFixed(0)}°</b> above eye level.` +
     `<br>Your picture gets about <b>${px(2048)} px</b> across at 2K, <b>${px(4096)} px</b> at 4K.` +
-    (el - h / 2 < 15 || el + h / 2 > 60 || Math.abs(val('az')) + w / 2 > 60 ? '<br><span style="color:#ff7e4d">It leaves the comfortable zone.</span>' : '');
+    (el - h / 2 < lo || el + h / 2 > hi || Math.abs(val('az')) + w / 2 > BAND_AZ ? '<br><span style="color:#ff7e4d">It leaves the comfortable zone.</span>' : '');
 }
 function loop() { draw(); requestAnimationFrame(loop); }
 document.querySelectorAll('input,select').forEach((e) => e.addEventListener('input', info));

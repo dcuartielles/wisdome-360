@@ -4,9 +4,9 @@
 -- A timed journey: Malmo -> Earth -> the Solar System -> the Milky Way.
 -- Four minutes, entirely scripted, entirely reproducible.
 --
--- Here you are not sending pixels to the dome, you are driving software
--- the dome already runs. With a dataset and some scripting confidence, it
--- is one of the strongest kinds of piece you can make.
+-- This is Pathway C: you are not sending pixels to the dome, you are
+-- driving software the dome already runs. For a team with a dataset and
+-- some scripting confidence, it is the strongest one-week project available.
 --
 -- Run it
 --   Script Log / console:   openspace.scriptScheduler.loadFile("tour.lua")
@@ -71,7 +71,7 @@ end
 -- performance. For a timed show, drive it from outside instead: OpenSpace
 -- exposes a WebSocket/HTTP API, so a 30-line Python script can sleep and send
 -- each step at the right wall-clock second. That also lets you trigger steps
--- live from a key press, which is what you actually want on the day when the
+-- live from a key press, which is what you actually want on Friday when the
 -- audience is slower than your rehearsal.
 --
 --   pip install websocket-client

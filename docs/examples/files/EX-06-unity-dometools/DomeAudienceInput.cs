@@ -3,11 +3,11 @@
 // =====================================================================
 // The cheapest real interaction a dome audience can have: their own voice.
 // Reads the default microphone and exposes a smoothed level plus a low-band
-// energy value, so a full room of people can push your scene around.
+// energy value, so 58 people in a room can push your scene around.
 //
 // Add it to one GameObject. Read DomeAudienceInput.Level from anywhere.
 //
-// Note for the show: a microphone in a dome will also hear the dome's own
+// Note for Friday: a microphone in a dome will also hear the dome's own
 // sound system. If your piece has a soundtrack, aim the mic at the seats,
 // or gate it, or you will build a feedback loop and it will be very loud.
 // =====================================================================

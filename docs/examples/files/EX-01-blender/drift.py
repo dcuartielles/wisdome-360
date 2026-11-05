@@ -1,5 +1,5 @@
 """
-EX-01  "DRIFT"  --  a pre-rendered dome master built in Blender / Cycles.
+EX-01  "DRIFT"  --  a Track A dome master built in Blender / Cycles.
 =====================================================================
 Run it either way:
 
@@ -10,13 +10,14 @@ WHAT THIS EXAMPLE DEMONSTRATES
   1. The ONLY camera setting that matters for a dome:
         camera.data.type          = 'PANO'
         camera.data.panorama_type = 'FISHEYE_EQUIDISTANT'
-        camera.data.fisheye_fov   = radians(180)
+        camera.data.fisheye_fov   = radians(FOV)      # FOV = 160, see below
      Everything else is ordinary Blender.
-  2. Square output. 2048 x 2048 for delivery, 1024 for iterating.
+  2. Square output. 4096 x 4096 for delivery, 2048 for iterating.
   3. Composition by ANGLE, not by eyeballing it -- see place_at(). The subject
      (the drifting orbs) lives in the COMFORTABLE ZONE: in front of the
-     audience, 15-60 deg above eye level, within 60 deg of the front, around
-     the sweet spot at 40 deg up. The shards ring the room as ambience.
+     audience, BAND (about 0-45 deg) above eye level, within BAND_AZ = 60 deg
+     of the front, around the venue's sweet spot SWEET_EL (about 20 deg up).
+     The shards ring the room as ambience.
   3b. The camera is tilted like the venue: Wisdome Malmo is tilted 26 deg,
      raised at the back, so the dome's zenith is 64 deg up in front of the
      audience. Leaning the camera the same way keeps the world level.
@@ -31,11 +32,22 @@ import bpy, math, random
 from math import radians, sin, cos, tau
 
 # ----------------------------------------------------------------- settings
-RES      = 1024      # 2048 for delivery
+RES      = 1024      # 4096 for final delivery
 FRAMES   = 1200    # 1200 @ 30fps = 40 s
 SAMPLES  = 16
 OUT      = "/tmp/drift/frame_"
 SEED     = 7
+
+# ----------------------------------------------------------- dome geometry
+# One place for every venue number (same names as the live slides' dome.js).
+TILT = 26.0          # Wisdome Malmo: tilted 26 deg, raised at the back
+FOV  = 160.0         # the venue spreads the whole master over its 160° screen; a 180° file would be squeezed
+# The venue counts angles in the image: 0 at the rim, 90 at the image centre.
+# Straight ahead, their angle a sits at elevation (90 - TILT) - (1 - a/90) * FOV/2.
+SWEET_VENUE = 40.0                                              # their sweet spot, on THEIR scale
+SWEET_EL = (90 - TILT) - (1 - SWEET_VENUE / 90) * FOV / 2       # ...in elevation above eye level: about 19.6
+BAND     = ((90 - TILT) - FOV / 2, SWEET_EL + 25)   # comfortable zone, elevation: from the rim at the front (-16) up to about 45
+BAND_AZ  = 60.0                             # ...and this many degrees either side of the front
 
 random.seed(SEED)
 sc = bpy.context.scene
@@ -51,7 +63,7 @@ for c in (bpy.data.objects, bpy.data.meshes, bpy.data.materials,
 cam_data = bpy.data.cameras.new("DomeCam")
 cam_data.type          = 'PANO'
 cam_data.panorama_type = 'FISHEYE_EQUIDISTANT'
-cam_data.fisheye_fov   = radians(180)          # a full hemisphere, nothing less
+cam_data.fisheye_fov   = radians(FOV)          # NOT 180: the venue maps the whole circle onto 160°
 cam = bpy.data.objects.new("DomeCam", cam_data)
 sc.collection.objects.link(cam)
 sc.camera = cam
@@ -70,7 +82,7 @@ sc.camera = cam
 #
 # That rotation puts world +Y at the BOTTOM of the rendered image, so
 # +Y is the FRONT of the room. Confirm your venue's convention before delivery.
-TILT = 26.0
+# (TILT is set in "dome geometry" at the top.)
 cam.location       = (0.0, 0.0, 1.6)
 cam.rotation_euler = (radians(180 - TILT), 0.0, 0.0)
 
@@ -84,8 +96,8 @@ def place_at(obj, elevation_deg, azimuth_deg, distance):
                        in front)
     azimuth   0 deg  = the FRONT of the room, +ve turns to the right
 
-    Comfortable zone: -60 <= azimuth <= 60 and 15 <= elevation <= 60.
-    Sweet spot: azimuth 0, elevation 40.
+    Comfortable zone: -BAND_AZ <= azimuth <= BAND_AZ and BAND[0] <= elevation <= BAND[1]
+    (about -60..60 and from the rim, -16, to 45). Sweet spot: azimuth 0, elevation SWEET_EL (about 20).
 
     Composing by angle instead of by position is the single habit that
     separates dome work that reads from dome work that does not.
@@ -143,9 +155,9 @@ N = 42
 for i in range(N):
     az   = 360.0 * i / N + random.uniform(-5, 5)
     dist = random.uniform(14, 44)
-    # Height is chosen so the TOP of each shard lands between about 25 and 65
+    # Height is chosen so the TOP of each shard lands between about 10 and 50
     # degrees of elevation -- pick the angle, solve for the height.
-    top_elev = random.uniform(25, 65)
+    top_elev = random.uniform(10, 50)
     h    = 1.6 + dist * math.tan(radians(top_elev))
     w    = random.uniform(0.30, 0.95)
     bpy.ops.mesh.primitive_cube_add(size=1)
@@ -171,8 +183,8 @@ for i in range(150):
 
 # -------------------------------------------------- drifting light spheres
 # The SUBJECT: what the eye follows. They live in the comfortable zone in
-# front of the audience (15-60 deg up, within 60 deg of the front), drifting
-# around the 40 deg sweet spot.
+# front of the audience (BAND, about 0-45 deg up, within 60 deg of the front),
+# drifting around the sweet spot SWEET_EL (about 20 deg up).
 orbs = []
 for i in range(9):
     bpy.ops.mesh.primitive_uv_sphere_add(radius=random.uniform(0.5, 1.5), segments=24, ring_count=12)
@@ -183,7 +195,7 @@ for i in range(9):
     o.data.materials.append(emission(f"Orb{i}", col, random.uniform(2.5, 5.5)))
     orbs.append({
         "obj": o,
-        "elev": random.uniform(22, 54),          # inside the comfortable zone
+        "elev": random.uniform(5, 38),           # inside the comfortable zone, around SWEET_EL
         "az0":  random.uniform(-30, 30),         # in front of the audience
         "speed": random.uniform(-26, 26),        # degrees across the whole shot: stays roughly in front
         "dist": random.uniform(13, 26),

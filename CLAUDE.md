@@ -37,6 +37,14 @@ If the status says something is waiting, tell David in one or two lines what is 
 
 - `/first-push`: create the GitHub repository, push, turn on Pages, check the site is live. Once only.
 - `/publish`: preflight checks, commit, push, watch the deploy, move queue entries to Published.
+- `/release`: cut the next release (tag + GitHub release) from the top section of `docs/changes.md`.
+
+## Releases
+
+- The site is released in versions: **v0.0.1 "protoclass"** is the first, tagged on commit `ecf24ab` (the site before the venue's 2 Nov 2026 corrections).
+- The top section of `docs/changes.md` is always `## vX.Y.Z — not released yet`. Every published change gets a line there, so **every modification becomes part of the next release**. The next release is **v0.0.2**.
+- `/publish` puts changes on the live site; it does not tag. Only `/release` tags, and only when David asks.
+- Never move, delete or re-use a tag. A fix to a release is a new release.
 
 ## Rules for every push
 
@@ -44,9 +52,10 @@ If the status says something is waiting, tell David in one or two lines what is 
 - Never force-push, never rewrite published history, never push to a branch other than `main` without being asked.
 - Videos and anything over 95 MB go on **GitHub Releases**, not in the repository (`gh release upload`).
 - **Licences.** Text and media we made: CC BY-SA 4.0. Code: GPL-3.0. Anything imported keeps its own licence and must be listed in `docs/credits.md` (source, author, licence, link) before it is published. If an item's licence doesn't allow public redistribution (e.g. the EX-10 UltraKey dove clip), don't publish it: link to the source instead. If unsure, ask David.
-- Student-visible changes get a dated line in `docs/changes.md`, newest first.
+- Student-visible changes get a line in `docs/changes.md`, in the top "not released yet" section, under today's date (### YYYY-MM-DD), newest first.
 - **Keep general and course content apart.** Anything specific to the MaU 2026 module (dates, deadlines, Canvas, groups, tracks A/B, running order, file names for the reel) goes under `docs/course/`. Every other page must make sense to someone who isn't on the course; it may link to the course section in one line.
-- **Live connections:** a live piece uses either NDI video + Dante audio (two Ethernet links, 5.1) or HDMI for both picture and sound (stereo only). Never describe HDMI video with Dante audio.
+- **Live connections** (David, 2026-11-05): a live piece sends its **picture over HDMI** (the venue input runs at 3840 × 2160; the square master centred, 2160²; OBS Fullscreen Projector is the usual way) and its **sound over Dante** (5.1, L R C LFE Ls Rs; Dante Virtual Soundcard or the course's Dante box). **Fallback:** HDMI carries stereo sound. **NDI is not used for student pieces**; don't present it as a route.
+- **Geometry** (venue, 2026-11-02): render fisheyes at **160°** (the player spreads the whole circle over the 160° screen; nothing is cropped). Sweet spot ≈ **20° above eye level** (the venue's "40" on its 0-at-rim, 90-at-centre scale). Comfortable zone: from the screen edge at the front (≈ −16°) to ≈ 45°, ±60°. 2048² = 12.8 px/°. The old values (180°, sweet spot 40° up, zone 15–60°, 11.4 px/°) are wrong.
 - Never add readings or other copyrighted PDFs: those live on Canvas only.
 - Never publish anything about individual students (names, groups' work, photos) without David's go-ahead.
 
@@ -74,6 +83,6 @@ docs/problems.md             problems by symptom
 docs/course/                 MaU course 2026 ONLY: start, the week, hand-in (deadlines, file names, Canvas)
 docs/changes.md, credits.md  about
 scripts/                     publish_status.py, preflight.py
-claude-setup/                hooks (settings.json) and /first-push, /publish: copied into .claude/
+claude-setup/                hooks (settings.json) and /first-push, /publish, /release: copied into .claude/
 .publish-queue.md            hand-off list from cloud sessions (git-ignored)
 ```

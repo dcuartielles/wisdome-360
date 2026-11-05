@@ -35,7 +35,7 @@ Plan the piece as positions in the room, not as a picture: where the subject is 
 - [ ] A storyboard in angles: what sits in the [comfortable zone](../reference/comfortable-zone.md), what wraps around, what happens overhead.
 - [ ] A first test at low resolution (1024²) seen in the simulator from the reference seat **and** from the back row.
 - [ ] If you use text: checked against the type-size card (EX-09). Minimum 1.5° cap height, 3° for anything people must read.
-- [ ] A sound plan: 5.1 or stereo. Track B: 5.1 needs the NDI + Dante route; HDMI carries stereo only.
+- [ ] A sound plan: 5.1 or stereo. Track B: 5.1 goes over Dante; keep a stereo mix too, in case you have to fall back to sound over HDMI.
 </div>
 
 <div class="w360-day session" markdown>
@@ -49,7 +49,7 @@ Plan the piece as positions in the room, not as a picture: where the subject is 
 
 - [ ] A rough version of the **whole** piece, start to finish, plays in the simulator.
 - [ ] You know how long it is (Track A: 90–180 s).
-- [ ] Track B: you have chosen your connection, **NDI + Dante** (5.1) or **HDMI** (stereo only), and tested it: NDI through the NDI bridge, HDMI through a capture card. See [Connecting a live piece](../reference/connecting.md).
+- [ ] Track B: your picture goes out over **HDMI** at 3840 × 2160 with the master centred, tested through a capture card or OBS in the Dome Simulator, and you know how you will send **Dante**: Dante Virtual Soundcard or the course's Dante box. See [Connecting a live piece](../reference/connecting.md).
 </div>
 
 <div class="w360-day" markdown>
@@ -75,7 +75,7 @@ Leave time for the final render: at 2048² a long piece takes hours, not minutes
 - **Morning:** dry run in the dome, in running order. Note what looks wrong; you can fix small things over lunch.
 - **Afternoon:** presentations. Three minutes per group to explain your decisions, in the dark, in the dome.
 
-Track B, bring: laptop and charger; for NDI + Dante two Ethernet links (adapters if your laptop has fewer than two ports), for HDMI an HDMI cable and any adapter your laptop needs; the fallback file on a USB stick. See [Hand-in](hand-in.md#friday).
+Track B, bring: laptop and charger; an HDMI cable and any adapter your laptop needs; an Ethernet port or USB-Ethernet adapter for Dante; the fallback file on a USB stick. See [Hand-in](hand-in.md#friday).
 </div>
 
 </div>

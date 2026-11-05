@@ -13,7 +13,7 @@ The format the dome plays: a dome-master video with its sound as separate files.
 | Projection | Equidistant azimuthal fisheye ("dome master") |
 | Resolution | **2048 × 2048**. The venue goes up to 6144 × 6144; agree with the venue before you deliver anything larger |
 | Aspect | 1:1 square, content inside the circle, corners pure black |
-| Field of view | 180° master. The dome shows the central **160°**: keep nothing in the outer ~11 % of the radius |
+| Field of view | **160°**. The venue spreads the whole circle over its 160° screen; a 180° master would be squeezed towards the centre |
 | Frame rate | **30 fps**, constant |
 | Codec | H.264 High profile (H.265 also accepted) |
 | Container | `.mp4` |
@@ -48,7 +48,8 @@ Run it on the files you are about to deliver, not on an earlier version.
 - [ ] Audio as separate WAVs, 48 kHz / 16-bit, one mono file per channel.
 - [ ] A sync blip on frame 1 of both picture and sound.
 - [ ] You have watched it once, whole, in the [Dome Simulator](../tools/dome-simulator.html), not only on a flat screen.
-- [ ] The subject is in the comfortable zone in front (15°–60° up, ±60°), near the 40° sweet spot, and nothing important is outside the central 160°.
+- [ ] The fisheye was rendered at **160°**, not 180°.
+- [ ] The subject is in the comfortable zone in front (from the bottom of the screen up to about 45°, ±60°), near the sweet spot about 20° up.
 - [ ] No roll, no fast global motion.
 
 MaU students: file names, deadline and where to upload are on [Hand-in](../course/hand-in.md).

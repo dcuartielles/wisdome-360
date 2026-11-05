@@ -46,7 +46,7 @@ Ask the venue, in this order. If the first answer is no, choose another tool str
 
 - **Hold the shot.** The instinct is to keep flying. In a dome, a held frame is when the audience finally looks around the rest of the hemisphere. Nothing in `tour.lua` moves in under twelve seconds, on purpose.
 - **Bring your own data.** A flight through the default solar system is a demo everyone has seen. A flight through *your* dataset (cycle routes, migration, ocean temperature, anything with coordinates) is a piece.
-- **Frame the subject in front.** The comfortable zone is 15°–60° above eye level, ±60° to the sides, with the sweet spot straight ahead at 40° up ([Where to put things](../reference/comfortable-zone.md)). The dome's own OpenSpace set-up already accounts for the 26° tilt. On your laptop, set the fisheye tilt in your window configuration to match before you judge a framing.
+- **Frame the subject in front.** The comfortable zone runs from the rim at the front (about −16°) up to about 45° above eye level, ±60° to the sides, with the sweet spot straight ahead at about 20° up ([Where to put things](../reference/comfortable-zone.md)). Those come from the venue's own scale: Wisdome counts angles in the image, 0 at the rim and 90 at the centre, and their sweet spot "40" is `(90 − 26) − (1 − 40/90) × 160/2 ≈ 19.6°` straight ahead. Wisdome Malmö is tilted 26°, raised at the back, and spreads the whole fisheye circle over a 160° screen; the dome's own OpenSpace set-up already accounts for both. On your laptop, set the fisheye in your window configuration to match before you judge a framing: **FOV 160** (not 180, which would be squeezed onto the dome) and tilt 26°. Then fly so the planet or dataset you care about ends up in that patch, not overhead.
 
 ## Record the fallback
 
@@ -59,4 +59,4 @@ OpenSpace can render frames to disk. Set the output to square, 2048², 30 fps, r
 | A call in the asset or tour is rejected | The Lua API changed in your version. Check the docs for that version: the *shape* of an asset is stable even when function names aren't |
 | The marker doesn't appear | The asset isn't in the profile, or the file isn't under `data/assets/customization/` |
 | The tour runs too fast or too slow | It is in simulation time. Drive it from outside for a performance |
-| The framing looks right on the laptop and wrong in the dome | The laptop's fisheye isn't tilted 26° like the dome |
+| The framing looks right on the laptop and wrong in the dome | The laptop's fisheye isn't tilted 26° like the dome, or its FOV is 180 instead of 160 |

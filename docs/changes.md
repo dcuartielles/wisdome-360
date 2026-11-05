@@ -4,16 +4,30 @@ title: What changed
 
 # What changed
 
-Every change to this site during the course is listed here, newest first. If something you relied on moved, it is in this list.
+Every change to this site is listed here, newest first, grouped by release. If something you relied on moved, it is in this list. Each release is also on the [Releases page](https://github.com/dcuartielles/wisdome-360/releases) of the repository.
 
-## 2026-10-21
+## v0.0.2 — not released yet
+
+Changes since the first release, *protoclass*. They are already on this site.
+
+### 2026-11-05
+
+- **Live pieces: picture over HDMI, sound over Dante.** The picture goes over HDMI at 3840 × 2160 with the dome master centred as a 2160² square; the 5.1 sound goes over Dante. If Dante fails, HDMI carries stereo sound. NDI is no longer used for student pieces. See [Connecting a live piece](reference/connecting.md). The setup wizard follows this.
+- **Corrected geometry, from the venue.** Wisdome spreads the whole circle of a dome master over its 160° screen, so **render the fisheye at 160°**, not 180°. The **sweet spot is about 20° above eye level**, not 40°, and the comfortable zone runs from the bottom of the screen at the front up to about 45°. Text sizes change with it: 1° = 12.8 px at 2K. See [Where to put things](reference/comfortable-zone.md).
+- **Examples updated to the new geometry:** files, pictures, pages and notebooks. The Dome Simulator uses the venue's 160° mapping.
+
+## v0.0.1 "protoclass" — 2026-11-05
+
+The first release: the site as it was before the venue's 2 November corrections. It still says to render at 180°, puts the sweet spot at 40°, and connects live pieces by NDI + Dante or HDMI alone.
+
+### 2026-10-21
 
 - **Examples:** every example now has its own page, with its files to download, how to run it, what to change first and what usually breaks. Start at [Examples](examples/index.md).
 - The Python examples (EX-02 Tide, EX-08 Flat to Dome, EX-09 Type size, EX-10 Flight) are notebooks you can run in Colab with nothing installed.
 - EX-10 Flight runs on a test clip of its own; the dove clip is downloaded from UltraKey (see [Credits](credits.md)).
 - EX-05 TouchDesigner: the 360° footage shader needs `uTilt = -26` for Wisdome; its notes said 0.
 
-## 2026-10-20 (afternoon)
+### 2026-10-20 (afternoon)
 
 - The site is now split into general pages and a **[MaU course 2026](course/index.md)** section with the week, the tracks and the hand-in.
 - **Corrected:** a live piece connects either by **NDI + Dante** (5.1 sound) or by **HDMI** (picture and stereo sound in one cable). New page: [Connecting a live piece](reference/connecting.md).
@@ -21,6 +35,6 @@ Every change to this site during the course is listed here, newest first. If som
 - Live pieces over HDMI: send a **16:9** signal with the dome master centred as a square, black at the sides.
 - Moved: *The week* → [MaU course 2026 › The week](course/week.md); *Delivery* → [Delivery spec](reference/delivery-spec.md) (format) and [Hand-in](course/hand-in.md) (deadline, file names); *Workflows* → [Make](make/index.md).
 
-## 2026-10-20
+### 2026-10-20
 
 - First version of the site: Start here, the week, setup wizard, Dome Simulator, workflows for both tracks, examples overview, problems, reference, delivery spec, credits.

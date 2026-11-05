@@ -26,7 +26,7 @@ This section has what is specific to the course: the week, the two tracks, deadl
 |---|---|---|
 | In one line | You deliver a film. We play it. | You bring a laptop. It runs live. |
 | What you hand in | A dome-master video and separate audio files | A working system on your laptop **and** a fallback recording |
-| How it reaches the dome | Joined with every other Track A film into one reel | You plug in your laptop: **NDI video + Dante audio** (two Ethernet cables, 5.1), **or HDMI** (one cable, stereo only) |
+| How it reaches the dome | Joined with every other Track A film into one reel | You plug in your laptop: picture over **HDMI**, sound over **Dante** in 5.1 (one HDMI cable, one Ethernet cable). If Dante fails, HDMI carries stereo sound |
 | Risk on Friday | Almost none | Real: machines fail. Hence the fallback |
 | Deadline | Files by **Friday 08:00** | Fallback recording by **Friday 08:00**, laptop at the dry run |
 | How to make it | [Making a film](../make/film.md) | [Making a live piece](../make/live.md) |

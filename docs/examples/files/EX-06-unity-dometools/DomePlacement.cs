@@ -8,8 +8,9 @@
 //
 // Why bother: a dome audience perceives your scene as directions, not as
 // coordinates. The comfortable zone is a patch IN FRONT of the audience --
-// 15 to 60 degrees above eye level, +-60 degrees either side of the front --
-// with the sweet spot straight ahead at 40 degrees up. Behind and far to the
+// about 0 to 45 degrees above eye level, +-60 degrees either side of the
+// front -- with the sweet spot straight ahead at about 20 degrees up (the
+// venue's "40", see SweetSpotVenue below). Behind and far to the
 // sides is ambience: nobody turns round for it. All of that is invisible if
 // you are dragging transforms around in XYZ.
 //
@@ -21,6 +22,7 @@
 // Wisdome Malmo is tilted 26 degrees, raised at the back. Tilt the Dome
 // Creator rig to match (its zenith leaning 26 degrees towards -Z) and keep
 // the world level, so these room angles are what the audience sees.
+// Render the master at a 160-degree fisheye, not 180 (see Fov below).
 // =====================================================================
 using UnityEngine;
 
@@ -32,8 +34,8 @@ public class DomePlacement : MonoBehaviour
     [Tooltip("0 = front of the room. Positive turns to the audience's right.")]
     [Range(-180f, 180f)] public float azimuth = 0f;
 
-    [Tooltip("0 = eye level, 90 = straight up. Comfortable: 15 to 60, in front.")]
-    [Range(-20f, 90f)] public float elevation = 40f;
+    [Tooltip("0 = eye level, 90 = straight up. Comfortable: about 0 to 45, in front.")]
+    [Range(-20f, 90f)] public float elevation = SweetSpotElevation;
 
     [Min(0.1f)] public float distance = 15f;
 
@@ -42,9 +44,9 @@ public class DomePlacement : MonoBehaviour
              "drift overhead, behind the seat backs, or round behind the audience. " +
              "Turn it off for ambience that wraps the whole dome.")]
     public bool clampToComfortableZone = true;
-    public float zoneLow  = 15f;     // degrees above eye level
-    public float zoneHigh = 60f;
-    public float zoneAzimuth = 60f;  // +- degrees either side of the front
+    public float zoneLow  = ZoneLowDefault;          // degrees above eye level (about 0)
+    public float zoneHigh = ZoneHighDefault;         // (about 45)
+    public float zoneAzimuth = ZoneAzimuthDefault;   // +- degrees either side of the front
 
     [Tooltip("Turn the object to face the dome centre, where the audience is.")]
     public bool faceAudience = true;
@@ -54,10 +56,16 @@ public class DomePlacement : MonoBehaviour
              "reliable way to make them ill.")]
     [Range(-10f, 10f)] public float azimuthDrift = 0f;
 
-    public const float ZoneLowDefault     = 15f;
-    public const float ZoneHighDefault    = 60f;
+    // ---- the venue, in one place ----
+    public const float Tilt = 26f;    // Wisdome Malmo: tilted 26 degrees, raised at the back
+    public const float Fov  = 160f;   // the venue spreads the whole master over its 160° screen; a 180° file would be squeezed
+    // The venue counts angles IN THE IMAGE: 0 at the rim, 90 at the centre.
+    // Straight ahead, their angle a is at elevation (90 - Tilt) - (1 - a/90) * Fov/2.
+    public const float SweetSpotVenue     = 40f;   // their sweet spot, on THEIR scale
+    public const float SweetSpotElevation = (90f - Tilt) - (1f - SweetSpotVenue / 90f) * Fov / 2f;   // about 19.6, straight ahead
+    public const float ZoneLowDefault     = (90f - Tilt) - Fov / 2f;   // the rim at the front, about -16
+    public const float ZoneHighDefault    = SweetSpotElevation + 25f;   // about 45
     public const float ZoneAzimuthDefault = 60f;
-    public const float SweetSpotElevation = 40f;   // straight ahead
     public const float SweetSpotRadius    = 12f;
 
     /// <summary>(azimuth, elevation, distance) -> a position in the room.</summary>
@@ -106,7 +114,7 @@ public class DomePlacement : MonoBehaviour
         DrawArc(zoneAzimuth, -zoneAzimuth, zoneHigh, zoneHigh);
         DrawArc(-zoneAzimuth, -zoneAzimuth, zoneHigh, zoneLow);
 
-        // the sweet spot: straight ahead, 40 degrees up
+        // the sweet spot: straight ahead, SweetSpotElevation (about 20) up
         Gizmos.color = new Color(1f, 0.85f, 0.30f, 0.95f);
         DrawSweetSpot();
 

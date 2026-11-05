@@ -23,9 +23,11 @@ Not sure where to start? [Making a film](../make/film.md) and [Making a live pie
 
 ## The one thing they all teach
 
-**Compose by angle, not by pixel.** Every example converts `(azimuth, elevation)` into whatever the tool needs, then does all its thinking in degrees. Azimuth 0 is the front of the room; elevation 0 is eye level. Once that is a habit, the comfortable zone stops being a rule to remember and becomes two pairs of numbers you can clamp: 15°–60° up, ±60° from the front.
+**Compose by angle, not by pixel.** Every example converts `(azimuth, elevation)` into whatever the tool needs, then does all its thinking in degrees. Azimuth 0 is the front of the room; elevation 0 is eye level. Once that is a habit, the comfortable zone stops being a rule to remember and becomes two pairs of numbers you can clamp: from the rim at the front (about −16°) up to about 45°, and ±60° from the front. The sweet spot is straight ahead, about 20° up.
 
 **Measure from the audience, not from the image centre.** Wisdome Malmö is tilted 26°, raised at the back, so the centre of a dome master is 64° up in front of the audience, not overhead. Every example handles the tilt in one place, and its guide overlay undoes the tilt before drawing the zone.
+
+**Render the fisheye at 160°, not 180°.** Wisdome's player spreads the whole circle of the master over its 160° screen. A 180° master plays, but everything is squeezed towards the centre by 8/9. Every example sets `FOV = 160`.
 
 ## The Python examples are notebooks
 

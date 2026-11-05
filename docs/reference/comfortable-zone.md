@@ -6,25 +6,29 @@ title: Where to put things
 
 ## A dome master in four facts
 
-A dome master is a square image in **equidistant azimuthal fisheye** projection.
+A dome master is a square image in **equidistant azimuthal fisheye** projection. At Wisdome it is rendered with a **160°** field of view.
 
-- **The centre of the circle is the dome's zenith, not straight up.** Wisdome Malmö is tilted 26°, raised at the back, so the centre of the image is **64° up, in front of the audience**.
-- **The edge of the circle is the dome's rim**: about 16° below eye level at the front, about 36° up at the back.
-- **Radius is linear in angle.** A pixel halfway out from the centre is 45° from the dome's zenith.
-- **The corners outside the circle are black** and are never projected. The dome shows the central 160° of the circle.
+- **The centre of the circle is the dome's zenith, not straight up.** Wisdome Malmö is tilted 26°, raised at the back, so the centre of the image is **64° above eye level, straight ahead**.
+- **The edge of the circle is the edge of the screen**: 16° below eye level at the front, 36° above eye level behind the audience. The venue's player spreads the **whole** circle over its 160° screen, so nothing is cropped.
+- **Radius is linear in angle.** The edge is 80° from the centre, so a pixel halfway out is 40° from the dome's zenith.
+- **The corners outside the circle are black** and are never projected.
+
+Render at 160°, not 180°. A 180° master still plays, but everything in it is squeezed towards the centre by 8/9, and your angles no longer match the room.
 
 ## The comfortable zone
 
-Measured from the seats, in room angles:
+Measured from the seats, in room angles (0° = eye level, straight ahead):
 
 | | Where | Use it for |
 |---|---|---|
-| **Sweet spot** | Straight ahead, **40° up**, about 12° around it | The one thing you most want people to see |
-| **Comfortable zone** | 15°–60° above eye level, within **±60°** of the front | Your subject, text, faces |
+| **Sweet spot** | Straight ahead, **about 20° above eye level** | The one thing you most want people to see |
+| **Comfortable zone** | From the bottom of the screen at the front (about −16°) up to **about 45°**, within **±60°** of the front | Your subject, text, faces |
 | Behind and far to the sides | Outside the zone | Ambience: colour, texture, weather |
-| Overhead | Above about 60° | Events and texture, not content: nobody can hold their head back for long |
+| Overhead | Above about 45° | Events and texture, not content: nobody can hold their head back for long |
 
 Because the dome is tilted, this zone is **not a ring around the centre of the master**. Use a guide overlay that undoes the tilt: the Dome Simulator and every example draw one.
+
+**Where the numbers come from.** The venue's technicians count angles in the image, 0 at the edge and 90 at the centre, like Paul Bourke's fulldome test pattern. Their sweet spot is "40". Straight ahead that is (90 − 26) − (1 − 40/90) × 160/2 ≈ **19.6° above eye level**. The zone follows Yu, Neafus & Wyatt's guidelines for a dome tilted like ours (*Filmmaking for Fulldome*, Planetarian, 2016–17): a relaxed gaze sits near eye level and reaches about 45° up.
 
 ## The five decisions every example makes
 
@@ -38,12 +42,12 @@ Because the dome is tilted, this zone is **not a ring around the centre of the m
 
 ## Text size
 
-1° of cap height ≈ **11.4 px at 2K**, 22.8 px at 4K, measured near the sweet spot.
+A 2048 master spans 160°, so **1° = 12.8 px** at 2K and 25.6 px at 4K.
 
-| | Cap height | At 2048² |
-|---|---|---|
-| Absolute minimum | 1.5° | ~17 px |
-| Body text people must read | 3° | ~34 px |
-| Titles | 6° and up | ~68 px and up |
+| | Cap height | At 2048² | At 4096² |
+|---|---|---|---|
+| Absolute minimum | 1.5° | 19 px | 38 px |
+| Body text people must read | 3° | 38 px | 77 px |
+| Titles | 6° and up | 77 px and up | 154 px and up |
 
 Check your own font with the EX-09 type-size card from the back row of the simulator.

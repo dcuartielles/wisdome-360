@@ -10,15 +10,16 @@
 // elevation linearly in RADIUS. Getting this wrong is the single most
 // common reason 360 footage "looks nearly right but wrong" on a dome.
 //
+// The master's circle spans FOV = 160 degrees (radius 1 = 80 degrees from the
+// centre), because that is what Wisdome spreads it over.
+//
 // TouchDesigner setup
 //   1. GLSL TOP, Pixel Shader = this file.
 //   2. Input 0 = your equirect source (2:1 aspect).
-//   3. Common page: Resolution -> Custom, 2048 x 2048 (SQUARE).
+//   3. Common page: Resolution -> Custom, 4096 x 4096 (SQUARE).
 //   4. Vectors page, custom uniforms:
 //        uRotate   float  0.0    degrees, to spin the horizon to your front
-//        uTilt     float -26.0   dome tilt: -26 for Wisdome Malmo (its zenith leans
-//                              26 deg to the front), 0 for a level dome. Add a
-//                              degree or two if the footage itself is off-level.
+//        uTilt     float  0.0    degrees, if the source horizon is not level
 // =====================================================================
 out vec4 fragColor;
 
@@ -26,6 +27,7 @@ uniform float uRotate;
 uniform float uTilt;
 
 #define PI 3.14159265359
+const float FOV = 160.0;   // the venue spreads the whole master over its 160 deg screen; a 180 deg file would be squeezed
 
 void main()
 {
@@ -34,15 +36,14 @@ void main()
     if (r > 1.0) { fragColor = vec4(0.0, 0.0, 0.0, 1.0); return; }
 
     // dome master -> a direction in the room
-    float elev = (1.0 - r) * (PI * 0.5);          // radians, 0 at the rim
+    float elev = PI * 0.5 - r * radians(FOV * 0.5);   // radians, 90 deg at the centre, 10 deg at the rim
     float az   = atan(p.x, -p.y) + radians(uRotate);
 
     vec3 dir = vec3(cos(elev) * sin(az),
                     sin(elev),
                     -cos(elev) * cos(az));        // -Z is the front
 
-    // the dome's tilt about the X axis (-26 for Wisdome Malmo), so the
-    // footage's horizon stays level for the audience
+    // optional tilt about the X axis, for footage shot off-level
     float ct = cos(radians(uTilt)), st = sin(radians(uTilt));
     dir = vec3(dir.x, dir.y * ct - dir.z * st, dir.y * st + dir.z * ct);
     dir = normalize(dir);

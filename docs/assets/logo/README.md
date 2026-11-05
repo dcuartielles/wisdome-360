@@ -1,6 +1,6 @@
 # Wisdome 360 logo
 
-The wordmark is "wisdome 360" with the **o drawn as a dome master**: the circle of the file, with the sweet spot (the amber dot) sitting below centre. That's where the sweet spot really falls in a Wisdome master: 40° up in front is 24° from the master's centre, towards the front (bottom) edge, about 0.27 of the radius.
+The wordmark is "wisdome 360" with the **o drawn as a dome master**: the circle of the file, with the sweet spot (the amber dot) sitting below centre, towards the front edge of the master. It is drawn at about 0.27 of the radius. Since the venue's 2 Nov 2026 correction (160° masters, sweet spot about 20° above eye level), the real sweet spot sits lower, at about 0.56 of the radius: 44° of the 80° from the centre to the edge. The mark keeps the idea; it isn't a measurement.
 
 | File | Use |
 |---|---|

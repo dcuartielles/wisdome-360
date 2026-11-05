@@ -5,20 +5,20 @@ EX-08  flat2dome.py  --  put FLAT pictures (slides, photos, video frames) on the
 A flat 16:9 picture pasted into the middle of a dome master is WRONG: the fisheye
 bends it, and it lands overhead. The right way is to "apply the fisheye lens":
 treat the picture as a flat SCREEN floating in the room, in front of the audience,
-and photograph that screen with the same 180-degree fisheye camera the dome uses.
+and photograph that screen with the same 160-degree fisheye camera the dome uses.
 Then the dome bends it back, and the audience sees it flat and straight.
 
     python3 flat2dome.py slide.png                  -> slide_dome.png  (2048 x 2048)
     python3 flat2dome.py frames/ -o dome_frames/    -> every image in a folder
-    python3 flat2dome.py slide.png --width 70 --elev 38 --res 4096
+    python3 flat2dome.py slide.png --width 70 --elev 22 --res 4096
 
 Options (all angles in degrees, measured from the audience):
     --width   how wide the screen looks (default 60). 16:9 at 60 deg is 33.75 deg tall.
-    --elev    where its centre sits above eye level (default 40 = the sweet spot)
+    --elev    where its centre sits above eye level (default SWEET_EL, about 19.6 = the sweet spot)
     --az      left/right (default 0 = straight ahead; + = right)
     --tilt    dome tilt, back raised (default 26 = Wisdome Malmo)
     --curved  bend the screen round the audience like a cinema screen (for wide pictures)
-    --res     master size (default 2048, the delivery size)
+    --res     master size (default 2048; 4096 for final delivery)
 
 Only numpy and Pillow. For VIDEO, ffmpeg does the same in one line (see README).
 """
@@ -26,8 +26,17 @@ import argparse, math, os, sys
 import numpy as np
 from PIL import Image
 
+TILT = 26.0          # Wisdome Malmo: tilted 26 degrees, raised at the back
+FOV  = 160.0         # the venue spreads the whole master over its 160° screen; a 180° file would be squeezed
+# Where to put things. The venue counts angles IN THE IMAGE: 0 at the rim, 90 at the
+# centre. Straight ahead, their angle a is at elevation (90 - TILT) - (1 - a/90) * FOV/2.
+SWEET_VENUE = 40.0                                          # their sweet spot, on THEIR scale
+SWEET_EL = (90 - TILT) - (1 - SWEET_VENUE / 90) * FOV / 2   # ...above eye level: about 19.6
+BAND     = ((90 - TILT) - FOV / 2, SWEET_EL + 25)   # comfortable zone, elevation: from the rim at the front (-16) up to about 45
+BAND_AZ  = 60.0                             # ...and this many degrees either side of the front
 
-def screen_uv(n, width, elev, az, tilt, aspect, curved, fov=180.0):
+
+def screen_uv(n, width, elev, az, tilt, aspect, curved, fov=FOV):
     """For every master pixel: where it lands on the flat picture (u, v in 0..1), or nan."""
     yy, xx = np.mgrid[0:n, 0:n].astype(np.float64)
     c = (n - 1) / 2.0
@@ -79,8 +88,8 @@ def warp(img, n, **kw):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('input'); ap.add_argument('-o', '--out')
-    ap.add_argument('--width', type=float, default=60); ap.add_argument('--elev', type=float, default=40)
-    ap.add_argument('--az', type=float, default=0); ap.add_argument('--tilt', type=float, default=26)
+    ap.add_argument('--width', type=float, default=60); ap.add_argument('--elev', type=float, default=round(SWEET_EL, 1))
+    ap.add_argument('--az', type=float, default=0); ap.add_argument('--tilt', type=float, default=TILT)
     ap.add_argument('--res', type=int, default=2048); ap.add_argument('--curved', action='store_true')
     ap.add_argument('--supersample', type=int, default=1, help='render at N x res and shrink (sharper, slower)')
     a = ap.parse_args()

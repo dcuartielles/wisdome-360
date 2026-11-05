@@ -40,7 +40,7 @@ kbd{background:#1a2434;border:1px solid var(--line);border-radius:4px;padding:1p
   <div class="card">
     <h1>Pulse</h1>
     <p>A live fisheye dome master, rendered every frame by one fragment shader.
-       This is a <b>live-piece</b> template: fork it, change the shader, plug the
+       This is a <b>Track&nbsp;B</b> template: fork it, change the shader, plug the
        laptop into the dome.</p>
     <button id="mic" class="primary">Enable microphone</button>
     <div id="meter"><div id="meterbar"></div></div>
@@ -98,9 +98,16 @@ float fbm(vec2 p){
 // roomDir() undoes the tilt: master position -> direction in the ROOM
 // (x = right, y = front, z = up). The guides below are measured with it.
 const float TILT = 26.0;
+const float FOV  = 160.0;   // the venue spreads the whole master over its 160 deg screen; a 180 deg file would be squeezed
+// Where to put things. The venue counts angles IN THE IMAGE: 0 at the rim, 90 at the
+// centre. Straight ahead, their angle a is at elevation (90 - TILT) - (1 - a/90) * FOV/2.
+const float SWEET_VENUE = 40.0;                                           // their sweet spot, on THEIR scale
+const float SWEET_EL = (90.0 - TILT) - (1.0 - SWEET_VENUE / 90.0) * FOV * 0.5; // ...above eye level: about 19.6
+const vec2  BAND     = vec2((90.0 - TILT) - FOV * 0.5, SWEET_EL + 25.0);  // comfortable zone, elevation: rim at the front (-16) .. about 45
+const float BAND_AZ  = 60.0;                                    // ...and +- this many degrees from the front
 vec3 roomDir(vec2 p){
   float r  = length(p);
-  float th = r * PI * 0.5;                              // angle from the DOME's zenith
+  float th = r * radians(FOV * 0.5);                    // angle from the DOME's zenith
   vec2  d  = r > 1e-6 ? p / r : vec2(0.0);
   vec3  l  = vec3(sin(th)*d.x, -sin(th)*d.y, cos(th));  // dome frame, y = front
   float c = cos(radians(TILT)), s = sin(radians(TILT));
@@ -123,7 +130,7 @@ void main(){
   float elev = degrees(asin(clamp(rd.z, -1.0, 1.0)));   // 0 = eye level, 90 = straight up
   float az   = degrees(atan(rd.x, rd.y));               // 0 = FRONT, + = right
   az = mod(az + 360.0, 360.0);
-  float dElev = (1.0 - r) * 90.0;                  // the DOME's own elevation: 0 at its rim
+  float dElev = (1.0 - r) * 90.0;                  // the venue's own scale: 0 at the rim, 90 at the centre
 
   // the comfortable zone is in front: 1 within +-60 deg of the front, fading behind
   float aFront = abs(mod(az + 180.0, 360.0) - 180.0);
@@ -137,8 +144,8 @@ void main(){
   // ---------------------------------------------------------------------
   // STEP 2 -- ribbons of light at (roughly) constant elevation: the SUBJECT.
   //
-  // They sit 16-60 deg above eye level -- the height of the comfortable
-  // zone -- and are brightest in front, where the audience looks. A ring at a
+  // They sit about 3-45 deg above eye level -- the height of the comfortable
+  // zone, BAND, either side of the sweet spot -- and are brightest in front, where the audience looks. A ring at a
   // constant elevation looks inert; letting the elevation wobble with
   // azimuth turns it into a rosette and makes the second dimension visible.
   // ---------------------------------------------------------------------
@@ -147,7 +154,7 @@ void main(){
   for (int i = 0; i < 14; i++) {
     if (float(i) >= uBands) break;
     float fi   = float(i);
-    float base = 16.0 + 44.0 * (fi + 0.5) / max(uBands, 1.0);   // 16..60 deg
+    float base = BAND.x + 3.0 + (BAND.y - BAND.x - 3.0) * (fi + 0.5) / max(uBands, 1.0);   // about 3..45 deg
     float lobes = 2.0 + mod(fi, 4.0);
     float amp   = (2.2 + 2.4 * fract(sin(fi * 12.9898) * 43758.5453));
     amp *= 1.0 + 1.6 * bass;
@@ -157,7 +164,7 @@ void main(){
     ribbons  += exp(-d * d * 2.2) * (0.55 + 0.45 * sin(fi * 1.7 + travel));
   }
   // fade below the zone and overhead; dim behind the audience
-  float vis = smoothstep(5.0, 14.0, elev) * (1.0 - smoothstep(62.0, 82.0, elev));
+  float vis = smoothstep(-5.0, 4.0, elev) * (1.0 - smoothstep(45.0, 65.0, elev));
   ribbons *= vis * mix(0.35, 1.0, front);
 
   // ---------------------------------------------------------------------
@@ -172,7 +179,7 @@ void main(){
   vec2  q  = vec2(cos(ar), sin(ar)) * 4.5 + vec2(cos(ar*3.0), sin(ar*3.0)) * 1.4;
   float cz = fbm(q + vec2(travel * 0.20, elev * 0.02));
   float curtain = pow(max(cz - 0.40, 0.0) * 2.8, 1.7);
-  curtain *= smoothstep(3.0, 18.0, elev) * (1.0 - smoothstep(24.0, 62.0, elev));
+  curtain *= smoothstep(-6.0, 8.0, elev) * (1.0 - smoothstep(16.0, 50.0, elev));
   curtain *= uCurtains * (0.5 + 0.9 * lvl);
 
   // ---------------------------------------------------------------------
@@ -205,15 +212,15 @@ void main(){
     float g = 0.0;
     for (int i=0;i<6;i++) g = max(g, guideLine(rEl - float(i)*15.0, 0.25));
     col = mix(col, vec3(0.45,0.60,1.0), g*0.45);
-    // comfortable zone: IN FRONT, 15-60 deg up, +-60 deg to the sides
+    // comfortable zone: IN FRONT, BAND.x-BAND.y up (about 0-45), +-BAND_AZ to the sides
     float aaz = abs(rAz);
-    float inZone = step(15.0, rEl) * step(rEl, 60.0) * step(aaz, 60.0);
+    float inZone = step(BAND.x, rEl) * step(rEl, BAND.y) * step(aaz, BAND_AZ);
     col = mix(col, col + vec3(0.015,0.035,0.02), inZone);
-    float edge = max(max(guideLine(rEl-15.0, 0.5), guideLine(rEl-60.0, 0.5)) * step(aaz, 60.0),
-                     guideLine((aaz-60.0)*cos(radians(rEl)), 0.5) * step(15.0, rEl) * step(rEl, 60.0));
+    float edge = max(max(guideLine(rEl-BAND.x, 0.5), guideLine(rEl-BAND.y, 0.5)) * step(aaz, BAND_AZ),
+                     guideLine((aaz-BAND_AZ)*cos(radians(rEl)), 0.5) * step(BAND.x, rEl) * step(rEl, BAND.y));
     col = mix(col, vec3(0.35,0.95,0.55), edge*0.9);
-    // sweet spot: straight ahead, 40 deg up
-    float a = degrees(acos(clamp(dot(rd, vec3(0.0, cos(radians(40.0)), sin(radians(40.0)))), -1.0, 1.0)));
+    // sweet spot: straight ahead, SWEET_EL up (about 20)
+    float a = degrees(acos(clamp(dot(rd, vec3(0.0, cos(radians(SWEET_EL)), sin(radians(SWEET_EL)))), -1.0, 1.0)));
     col = mix(col, vec3(1.0,0.85,0.30), guideLine(a-12.0, 0.6));
     col = mix(col, vec3(1.0,0.85,0.30), 1.0 - smoothstep(1.0, 1.4, a));
   }
@@ -321,7 +328,7 @@ document.getElementById('shot').addEventListener('click', () => {
   say(`Saved a ${SIZE}×${SIZE} dome master.`);
 });
 
-/* ---------- record the fallback clip every live piece needs ---------- */
+/* ---------- record the fallback clip every Track B team needs ---------- */
 let mr = null, chunks = [];
 document.getElementById('rec').addEventListener('click', e => {
   if (mr && mr.state === 'recording') { mr.stop(); return; }

@@ -39,17 +39,17 @@
    becomes a dome sketch. Lines of constant elevation become arcs, correctly.
 
    Where things go:
-       comfortable zone = IN FRONT, 15-60 degrees above eye level,
-                          +-60 degrees either side of the front
-       sweet spot       = straight ahead, 40 degrees up
+       comfortable zone = IN FRONT, ZONE.lo-ZONE.hi (about 0-45) degrees
+                          above eye level, +-60 degrees either side of the front
+       sweet spot       = straight ahead, SWEET.el (about 20) degrees up
        everything else  = ambience. Nobody turns round for it.
    Press G to see them drawn over the sketch.
 
    What roomXY() does, so you can check it yourself. A dome master is an
    equidistant fisheye of the DOME's hemisphere:
        centre of the canvas = the dome's zenith
-       edge of the canvas   = the dome's rim
-       radius is LINEAR in angle from the dome's zenith (50% out = 45 deg)
+       edge of the canvas   = FOV/2 = 80 degrees from it (the venue's screen edge)
+       radius is LINEAR in angle from the dome's zenith (50% out = 40 deg)
        the front of the room is at the BOTTOM
    Wisdome Malmo is TILTED 26 degrees, raised at the back, so the dome's
    zenith is not overhead: it is 64 degrees up, in front of the audience.
@@ -57,10 +57,15 @@
    places them on the canvas (domeXY).
    ======================================================================= */
 
-const RES   = 1024;        // 2048 when you export for delivery
+const RES   = 1024;        // 4096 when you export for delivery
 const TILT  = 26;          // dome tilt in degrees (Wisdome Malmo), back raised
-const ZONE  = { lo: 15, hi: 60, az: 60 };   // comfortable zone (audience degrees)
-const SWEET = { el: 40, r: 12 };            // sweet spot, straight ahead
+const FOV   = 160;         // the venue spreads the whole master over its 160° screen; a 180° file would be squeezed
+// Where to put things. The venue counts angles IN THE IMAGE: 0 at the rim, 90 at the
+// centre. Straight ahead, their angle a is at elevation (90 - TILT) - (1 - a/90) * FOV/2.
+const SWEET_VENUE = 40;                                          // their sweet spot, on THEIR scale
+const SWEET_EL = (90 - TILT) - (1 - SWEET_VENUE / 90) * FOV / 2; // ...above eye level: about 19.6
+const ZONE  = { lo: (90 - TILT) - FOV / 2, hi: SWEET_EL + 25, az: 60 };  // comfortable zone (audience degrees): rim (-16) .. about 45, +-60
+const SWEET = { el: SWEET_EL, r: 12 };                           // sweet spot, straight ahead
 const LEADS = 6;           // voices that sing in the comfortable zone
 const AMBIENT = 4;         // voices that drift all the way round, quietly
 
@@ -76,19 +81,19 @@ function roomXY(azDeg, elDeg) {
 /* the dome's own angles -> the canvas (centre = dome zenith, front at the bottom) */
 function domeXY(azDeg, elevDeg) {
   const c = RES / 2;
-  const r = (1 - constrain(elevDeg, 0, 90) / 90) * c;   // linear in angle
+  const r = constrain(90 - elevDeg, 0, FOV / 2) / (FOV / 2) * c;   // linear in angle from the zenith
   const a = radians(azDeg);
   return [c + r * sin(a), c + r * cos(a)];              // az 0 -> bottom
 }
 
 /* audience angles -> dome angles. Room: x = right, y = front, z = up.
-   Returns [domeAz, domeElev], or null below the dome's rim. */
+   Returns [domeAz, domeElev], or null outside the master's circle. */
 function roomToDome(azDeg, elDeg) {
   const a = radians(azDeg), e = radians(elDeg), t = radians(TILT);
   const x = cos(e) * sin(a), y = cos(e) * cos(a), z = sin(e);
   const ly = y * cos(t) - z * sin(t), lz = y * sin(t) + z * cos(t);
   const de = degrees(Math.asin(constrain(lz, -1, 1)));
-  if (de < 0) return null;
+  if (de < 90 - FOV / 2) return null;           // more than FOV/2 from the zenith
   return [degrees(Math.atan2(x, ly)), de];
 }
 
@@ -97,7 +102,7 @@ function canvasToRoom(px, py) {
   const c = RES / 2, dx = (px - c) / c, dy = (py - c) / c;
   const r = Math.hypot(dx, dy);
   if (r > 1) return null;
-  const th = r * HALF_PI, a = Math.atan2(dx, dy), t = radians(TILT);
+  const th = r * radians(FOV / 2), a = Math.atan2(dx, dy), t = radians(TILT);
   const lx = sin(th) * sin(a), ly = sin(th) * cos(a), lz = cos(th);
   const x = lx, y = ly * cos(t) + lz * sin(t), z = -ly * sin(t) + lz * cos(t);
   return [degrees(Math.atan2(x, y)), degrees(Math.asin(constrain(z, -1, 1)))];
@@ -133,7 +138,7 @@ function newVoice(lead, az, el) {
   return {
     lead,
     az:     az ?? (lead ? random(-40, 40) : random(-180, 180)),
-    elev:   el ?? (lead ? random(26, 54) : random(30, 70)),
+    elev:   el ?? (lead ? random(8, 38) : random(25, 60)),   // leads around SWEET.el (about 20)
     span:   lead ? random(40, 100) : random(120, 220),   // degrees of azimuth it reaches
     lobes:  floor(random(2, 6)),
     amp:    lead ? random(2.5, 6) : random(2, 4),
@@ -218,7 +223,7 @@ function drawGuide() {
     ...range(ZONE.hi, ZONE.lo, 30).map((el) => [-ZONE.az, el]),
   ]);
 
-  // the sweet spot: straight ahead, 40 degrees up, 12-degree radius
+  // the sweet spot: straight ahead, SWEET.el (about 20) degrees up, 12-degree radius
   stroke(45, 80, 100, 0.95); strokeWeight(3);
   const se = radians(SWEET.el), sr = radians(SWEET.r);
   roomPath(range(0, TAU, 72).map((f) => {

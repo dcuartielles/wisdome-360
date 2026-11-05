@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """EX-09 — Type size: how small can text be on the dome?
 
-Writes dome masters (square, equidistant fisheye, 180°, bottom edge = front of the
+Writes dome masters (square, equidistant fisheye, 160°, bottom edge = front of the
 room) for Wisdome Malmö (tilted 26°, raised at the back):
 
   ex09_ladder_<res>.png      one line of text at cap heights from 8° down to 0.75°,
@@ -13,13 +13,14 @@ room) for Wisdome Malmö (tilted 26°, raised at the back):
                              the SAME ladder typed straight into the dome master, for
                              comparison: on the dome its lines curve and its sizes drift
 
-Measure type in DEGREES, not points or pixels. 2048 px span 180°, so 1° ≈ 11.4 px
-of a 2K master and ≈ 22.8 px of a 4K master. Sizes here are CAP HEIGHT (the
+Measure type in DEGREES, not points or pixels. 2048 px span 160°, so 1° = 12.8 px
+of a 2K master and 25.6 px of a 4K master. Sizes here are CAP HEIGHT (the
 height of a capital H) seen from the centre seat.
 
 Projection: the EX-08 method. The card is one flat screen hanging in the room,
-centred on the sweet spot (straight ahead, 40° up), photographed through the 180°
-fisheye with the dome's 26° tilt. From the seats every line is upright and straight.
+centred on the sweet spot (straight ahead, SWEET_EL ≈ 19.6° up -- the venue's "40"),
+photographed through the 160° fisheye with the dome's 26° tilt. Every row is placed
+relative to that centre, so if the sweet spot moves, the card moves with it. From the seats every line is upright and straight.
 A flat screen magnifies towards its edges, so each row's font size is corrected for
 its height on the screen: the cap height is true where the row crosses the middle.
 
@@ -39,7 +40,15 @@ from scipy.ndimage import map_coordinates
 HERE = Path(__file__).resolve().parent
 FONTS = HERE / "fonts"
 TILT = radians(26)                       # Wisdome Malmö: tilted 26°, raised at the back
-SWEET_EL = 40.0                          # the screen's centre: straight ahead, 40° up
+FOV = 160.0                              # the venue spreads the whole master over its 160° screen; a 180° file would be squeezed
+# The venue counts angles IN THE IMAGE: 0 at the rim, 90 at the centre. Straight ahead,
+# their angle a is at elevation (90 - tilt) - (1 - a/90) * FOV/2.
+SWEET_VENUE = 40.0                                                    # their sweet spot, on THEIR scale
+SWEET_EL = (90 - degrees(TILT)) - (1 - SWEET_VENUE / 90) * FOV / 2   # ...above eye level: about 19.6
+BAND = ((90 - TILT) - FOV / 2, SWEET_EL + 25)    # comfortable zone, elevation: from the rim at the front (-16) up to about 45
+BAND_AZ = 60.0                           # ...and this many degrees either side of the front
+CARD_EL = SWEET_EL                       # the card's centre: straight ahead, on the sweet spot.
+                                         # Every row below is CARD_EL + an offset in degrees.
 SAMPLE = "Hej Malmö"
 LADDER = [8, 6, 4, 3, 2, 1.5, 1, 0.75]   # cap height, degrees
 LABEL_CAP = 1.6                          # the labels: just above the minimum
@@ -53,7 +62,7 @@ WHITE, DIM, FRAME, HEAD = (242, 245, 250), (143, 163, 190), (70, 90, 125), (255,
 
 
 def ppd(res):
-    return (res / 2) / 90.0               # equidistant 180°: the radius spans 90°
+    return (res / 2) / (FOV / 2)          # equidistant, FOV = 160°: the radius spans 80°
 
 
 def F(name, px):
@@ -75,26 +84,26 @@ def cls(cap):
 
 
 class Screen:
-    """A flat screen in the room, facing the audience, centred at (az 0, SWEET_EL).
+    """A flat screen in the room, facing the audience, centred at (az 0, CARD_EL).
     Positions: x in screen units (tan of the angle sideways), rows by elevation in degrees."""
-    def __init__(self, res, half_w=58.0, el_lo=6.0, el_hi=70.0, ss=SS):
+    def __init__(self, res, half_w=58.0, el_lo=CARD_EL - 34.0, el_hi=CARD_EL + 30.0, ss=SS):
         self.res, self.ss = res, ss
         self.k = ss * ppd(res) * 180 / pi            # image px per screen unit
         self.xmax = tan(radians(half_w))
-        self.ytop = tan(radians(el_hi - SWEET_EL))
-        self.ybot = tan(radians(el_lo - SWEET_EL))
+        self.ytop = tan(radians(el_hi - CARD_EL))
+        self.ybot = tan(radians(el_lo - CARD_EL))
         W, H = int(2 * self.xmax * self.k), int((self.ytop - self.ybot) * self.k)
         self.im = Image.new("RGB", (W, H), (0, 0, 0))
         self.d = ImageDraw.Draw(self.im)
 
     def y(self, el):                                  # elevation (at x = 0) -> image row
-        return (self.ytop - tan(radians(el - SWEET_EL))) * self.k
+        return (self.ytop - tan(radians(el - CARD_EL))) * self.k
 
     def x(self, u):                                   # screen units -> image column
         return (u + self.xmax) * self.k
 
     def size_px(self, el, deg):                       # an angle `deg` tall, centred on row `el`
-        return self.k * (tan(radians(el + deg / 2 - SWEET_EL)) - tan(radians(el - deg / 2 - SWEET_EL)))
+        return self.k * (tan(radians(el + deg / 2 - CARD_EL)) - tan(radians(el - deg / 2 - CARD_EL)))
 
     def text(self, s, font, cap, colour, u, el, align="l"):
         """Capital H `cap` degrees tall, its middle on elevation `el`. Returns width in screen units."""
@@ -118,7 +127,7 @@ def room_to_master(res, X, Y, Z):
     zl = Y * sin(TILT) + Z * cos(TILT)
     th = np.arccos(np.clip(zl, -1, 1))
     A = np.arctan2(X, yl)
-    r = th / (np.pi / 2) * (res / 2)
+    r = th / radians(FOV / 2) * (res / 2)
     return res / 2 + r * np.sin(A) - 0.5, res / 2 + r * np.cos(A) - 0.5
 
 
@@ -129,15 +138,15 @@ def project(scr, flat=False):
     h, w = P.shape[:2]
     k = scr.k / ss                                    # px of `small` per screen unit
     out = np.zeros((res, res, 3), np.float32)
-    if flat:   # typed straight into the master: paste 1:1 with the screen centre on the sweet spot
-        e = radians(SWEET_EL)
+    if flat:   # typed straight into the master: paste 1:1 with the screen centre on the card centre
+        e = radians(CARD_EL)
         cx, cy = room_to_master(res, 0.0, cos(e), sin(e))
         cx0, cy0 = int(round(cx - (scr.xmax * k))), int(round(cy - scr.ytop * k))
         x0, y0 = max(0, cx0), max(0, cy0)
         x1, y1 = min(res, cx0 + w), min(res, cy0 + h)
         out[y0:y1, x0:x1] = P[y0 - cy0:y1 - cy0, x0 - cx0:x1 - cx0]
     else:
-        e = radians(SWEET_EL)
+        e = radians(CARD_EL)
         f = np.array([0.0, cos(e), sin(e)])          # X right, Y front, Z up
         right = np.array([1.0, 0.0, 0.0])
         up = np.array([0.0, -sin(e), cos(e)])
@@ -146,7 +155,7 @@ def project(scr, flat=False):
             yy, xx = np.mgrid[y0:min(res, y0 + 256), 0:res].astype(np.float32)
             dx, dy = (xx + 0.5 - c) / c, (yy + 0.5 - c) / c
             r = np.hypot(dx, dy)
-            th = r * (np.pi / 2); A = np.arctan2(dx, dy)
+            th = r * radians(FOV / 2); A = np.arctan2(dx, dy)
             xl, yl, zl = np.sin(th) * np.sin(A), np.sin(th) * np.cos(A), np.cos(th)
             X, Y, Z = xl, yl * cos(TILT) + zl * sin(TILT), -yl * sin(TILT) + zl * cos(TILT)
             qf = X * f[0] + Y * f[1] + Z * f[2]
@@ -166,21 +175,26 @@ def project(scr, flat=False):
 
 
 # ----------------------------------------------------------------------------- the cards
-def legend(scr, el=9.0):
+def legend(scr, u=0.30, el=CARD_EL - 7.0, step=3.4):
+    """The colour key, as a column in the empty lower-right corner of the frame
+    (about 17-40° to the right, a few degrees above eye level): inside the
+    comfortable zone, and well clear of the rim, which straight ahead is only
+    16° below eye level. Off to the side a flat screen is further away than the
+    middle of the same row (by sqrt(1 + u²/(1 + v²))), so the type is drawn that
+    much bigger to keep its 1.3° cap height."""
     parts = [(col, (f"≥ {lo:g}°  {name}" if lo > 0 else f"< 1.5°  {name}")) for lo, col, name in CLASSES]
-    widths = [scr.text(t, "Poppins-Regular.ttf", 1.3, (0, 0, 0), 0, el) for _, t in parts]   # measure
-    gap = 0.08
-    u = -(sum(widths) + gap * (len(parts) - 1)) / 2
-    for (col, t), w in zip(parts, widths):
-        scr.text(t, "Poppins-Regular.ttf", 1.3, col, u, el); u += w + gap
+    for i, (col, t) in enumerate(parts):
+        e = el - i * step
+        grow = (1 + u * u / (1 + tan(radians(e - CARD_EL)) ** 2)) ** 0.5
+        scr.text(t, "Poppins-Regular.ttf", 1.3 * grow, col, u, e)
 
 
 def ladder(res):
     s = Screen(res)
     L, LR = -0.30, -0.36                              # samples start / labels end (screen units)
     s.text("EX-09  TYPE SIZE  ·  cap height in degrees  ·  px of a 2K | 4K master",
-           "Poppins-Bold.ttf", 1.6, HEAD, 0, 66.0, "m")
-    top = 62.0
+           "Poppins-Bold.ttf", 1.6, HEAD, 0, CARD_EL + 27.5, "m")
+    top = CARD_EL + 23.5                              # so the smallest row ends at the zone's lower edge
     for cap in LADDER:
         el = top - cap / 2
         col = cls(cap)
@@ -190,7 +204,7 @@ def ladder(res):
         tick = max(cap, 1.0)
         s.rect(-0.335, el - tick / 2, -0.322, el + tick / 2, None, fill=col)
         top -= max(cap * 1.42, LABEL_CAP * 1.25) + 0.9
-    s.rect(-0.86, 16.0, 0.96, 63.6, FRAME, width_px2k=4)       # the rectangle
+    s.rect(-0.86, CARD_EL - 22.5, 0.96, CARD_EL + 25.1, FRAME, width_px2k=4)       # the rectangle
     legend(s)
     return s
 
@@ -199,27 +213,27 @@ def detail(res):
     s = Screen(res)
     L, LR = -0.30, -0.36
     s.text("EX-09  WHAT BREAKS FIRST  ·  fine detail on a 2K | 4K master",
-           "Poppins-Bold.ttf", 1.6, HEAD, 0, 66.0, "m")
+           "Poppins-Bold.ttf", 1.6, HEAD, 0, CARD_EL + 26.0, "m")
     lab = lambda el, t, col=DIM: s.text(t, "Poppins-Regular.ttf", 1.4, col, LR, el, "r")
     weights = [("Thin", "Inter-Thin.otf"), ("Light", "Inter-Light.otf"),
                ("Regular", "Inter-Regular.otf"), ("Bold", "Inter-Bold.otf"), ("Black", "Inter-Black.otf")]
-    for el, cap in ((58.5, 3.0), (52.0, 1.5)):
+    for el, cap in ((CARD_EL + 18.5, 3.0), (CARD_EL + 12.0, 1.5)):
         lab(el, f"weights at {cap:g}°", cls(cap))
         u = L
         for name, fn in weights:
             u += s.text(name, fn, cap, WHITE, u, el) + 0.03 * cap
-    for el, cap in ((45.5, 3.0), (40.0, 1.5)):
+    for el, cap in ((CARD_EL + 5.5, 3.0), (CARD_EL, 1.5)):
         lab(el, f"serif vs sans at {cap:g}°", cls(cap))
         u = L + s.text("Hamburgefonts", "LiberationSerif-Regular.ttf", cap, WHITE, L, el) + 0.06
         s.text("Hamburgefonts", "Poppins-Regular.ttf", cap, WHITE, u, el)
-    el = 34.5
+    el = CARD_EL - 5.5
     lab(el, "thin white on black", (255, 95, 95))
     u = L
     for t, fn, c in (("thin, pure white", "Inter-Thin.otf", (255, 255, 255)),
                      ("regular, soft white", "Inter-Regular.otf", (215, 220, 228)),
                      ("bold, warm", "Inter-Bold.otf", (255, 214, 170))):
         u += s.text(t, fn, 1.5, c, u, el) + 0.06
-    el = 27.5
+    el = CARD_EL - 12.5
     lab(el, "lines, px of 2K")
     u = L
     for wpx in (1, 2, 3, 4, 6, 8):
@@ -231,7 +245,7 @@ def detail(res):
         s.d.rectangle([xm - t // 2, s.y(el + 2.2), xm - t // 2 + t - 1, s.y(el - 2.2)], fill=WHITE)
         s.text(f"{wpx}", "Poppins-Regular.ttf", 1.0, DIM, u + 0.04, el - 3.6, "m")
         u += 0.14
-    el = 19.5
+    el = CARD_EL - 20.5
     lab(el, "stripes, px of 2K")
     u = L
     for per in (1, 2, 3, 4, 8):
@@ -242,7 +256,7 @@ def detail(res):
             x += 2 * p
         s.text(f"{per}", "Poppins-Regular.ttf", 1.0, DIM, u + 0.05, el - 3.2, "m")
         u += 0.16
-    s.rect(-0.86, 13.0, 1.06, 63.6, FRAME, width_px2k=4)
+    s.rect(-0.86, CARD_EL - 25.5, 1.16, CARD_EL + 23.6, FRAME, width_px2k=4)   # wide enough for "Black"
     return s
 
 

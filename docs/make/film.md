@@ -16,7 +16,7 @@ You make a video, and the dome plays it from its own system. Nothing to plug in,
 | Use your own video, filmed on green screen | **EX-10 Flight** (Python + OpenCV) |
 | Show slides, photos or 16:9 video | **EX-08 Flat to Dome** |
 
-Whatever the tool, the camera must be a **180° equidistant fisheye**, tilted like the venue. In Blender: panoramic camera, *Fisheye Equidistant*, 180°, rotated `180° − 26°` about X.
+Whatever the tool, the camera must be a **160° equidistant fisheye**, tilted like the venue. In Blender: panoramic camera, *Fisheye Equidistant*, field of view 160°, rotated `180° − 26°` about X. Not 180°: the venue spreads the whole circle over its 160° screen.
 
 ## 2. Work small, check often
 

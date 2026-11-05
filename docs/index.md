@@ -17,15 +17,15 @@ How to make pictures, films and live pieces for **Wisdome Malmö**, the tilted 1
 
 ## The one idea behind everything here
 
-**Compose by angle, not by pixel, and measure from the seats.** The dome is tilted 26°, raised at the back, so the centre of a dome master is not overhead: it is 64° up, in front of the audience. Put your subject in the patch in front, 15°–60° above eye level and within 60° either side, aimed at the **sweet spot, straight ahead and 40° up**. [Where to put things](reference/comfortable-zone.md) explains why.
+**Compose by angle, not by pixel, and measure from the seats.** The dome is tilted 26°, raised at the back, so the centre of a dome master is not overhead: it is 64° up, in front of the audience. Put your subject in the patch in front, from the bottom of the screen up to about 45° above eye level and within 60° either side, aimed at the **sweet spot, straight ahead and about 20° up**. Render your fisheye at **160°**, the width of the screen. [Where to put things](reference/comfortable-zone.md) explains why.
 
 ## Two ways to show work in the dome
 
 | | **A film** | **A live piece** |
 |---|---|---|
 | What you make | A rendered dome-master video and separate audio | A program that draws the dome master in real time |
-| How it reaches the dome | Played from the dome's own system | Your laptop is plugged in: NDI + Dante, or HDMI |
-| Sound | Up to 5.1 | 5.1 with NDI + Dante; stereo only over HDMI |
+| How it reaches the dome | Played from the dome's own system | Your laptop is plugged in: HDMI for the picture, Dante for the sound |
+| Sound | Up to 5.1 | 5.1 over Dante; stereo over HDMI as a fallback |
 | Risk | Almost none | Real: machines fail, so keep a recording as a fallback |
 | Start with | [Making a film](make/film.md) | [Making a live piece](make/live.md) |
 

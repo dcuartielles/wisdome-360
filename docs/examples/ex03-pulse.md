@@ -49,11 +49,15 @@ float elev = degrees(asin(rd.z));                // 0 = eye level, 90 = straight
 float az   = degrees(atan(rd.x, rd.y));          // 0 = the front of the room
 ```
 
-After those lines you are no longer writing a screen shader. You are writing a function of **where in the room, as the audience sees it**, and every dome rule becomes something you can write down. `smoothstep(5.0, 14.0, elev)` *is* "fade out towards eye level".
+After those lines you are no longer writing a screen shader. You are writing a function of **where in the room, as the audience sees it**, and every dome rule becomes something you can write down. `smoothstep(-5.0, 4.0, elev)` *is* "fade out just below eye level".
 
 `roomDir()` is the only place that knows the dome is tilted. The centre of a dome master is the dome's own zenith, which in Wisdome Malmö is 64° up in front of the audience. `roomDir()` undoes the tilt.
 
-Press ++g++ to see where things go. The ribbons are the subject: 16°–60° above eye level and brightest in front (`front` in STEP 1 dims them to a third behind the audience). The curtains and the point field are ambience and wrap the whole room.
+It is also the only place that knows the **field of view**: `FOV = 160.0`. Wisdome's player spreads the whole circle of the master over its 160° screen, so the edge of the circle is 80° from the centre, not 90° (`th = r * radians(FOV * 0.5)`). A 180° master would be squeezed towards the centre by 8/9.
+
+Press ++g++ to see where things go. The comfortable zone is a patch **in front**: `BAND` runs from the rim at the front (about −16°) up to about 45° above eye level, and `BAND_AZ` is ±60° to the sides. The sweet spot is straight ahead at `SWEET_EL`, about 20° up. Both come from the venue's own scale: Wisdome counts angles in the image, 0 at the rim and 90 at the centre, and their sweet spot is "40". So `SWEET_EL = (90 - TILT) - (1 - SWEET_VENUE/90) * FOV/2` ≈ 19.6°, and `BAND` ends at `SWEET_EL + 25`. See [Where to put things](../reference/comfortable-zone.md).
+
+The ribbons are the subject: about 3°–45° above eye level, inside `BAND` and either side of the sweet spot, and brightest in front (`front` in STEP 1 dims them to a third behind the audience). The curtains and the point field are ambience and wrap the whole room.
 
 ## The seam bug, and the fix
 
@@ -69,12 +73,13 @@ Periodic by construction. You will hit this bug in your own shader; now you know
 
 ## Getting it onto the dome
 
-The browser window is your output. To rehearse, share the window into the [Dome Simulator](../tools/dome-simulator.html). On the day, how it reaches the dome depends on the route, see [Connecting a live piece](../reference/connecting.md):
+The browser window is your output. The picture goes to the dome **over HDMI** and the sound **over Dante**; see [Connecting a live piece](../reference/connecting.md).
 
-- **NDI + Dante:** send the window with an NDI screen-capture tool.
-- **HDMI:** the HDMI signal is 16:9. Put the browser on that display, press **Dome output**, and the square master sits in the middle with black at the sides.
+- **Picture:** put the browser on the HDMI display and press **Dome output**, or capture the window in OBS and use its Fullscreen Projector. The dome's display runs at 3840 × 2160, so the square master sits in the middle, 2160 × 2160, with black at the sides.
+- **Sound:** 5.1 over Dante, from Dante Virtual Soundcard or the course's Dante box. If Dante fails, the HDMI cable carries stereo sound.
+- **Rehearse** in the [Dome Simulator](../tools/dome-simulator.html): share the window, use a virtual Dome monitor, or use a USB HDMI capture card (see [Making a live piece](../make/live.md#3-rehearse-on-your-laptop)).
 
-Either way: turn off notifications, screen savers and automatic updates. An update banner on a dome is enormous. Measure the latency in the room (press a key, watch the dome); if it is over about 100 ms, design the interaction so timing doesn't matter.
+Turn off notifications, screen savers and automatic updates. An update banner on a dome is enormous. Measure the latency in the room (press a key, watch the dome); if it is over about 100 ms, design the interaction so timing doesn't matter.
 
 ## Try changing first
 

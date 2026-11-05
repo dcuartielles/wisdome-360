@@ -7,7 +7,7 @@ EX-10  "FLIGHT"  --  real footage in the dome: a green-screen dove, keyed and fl
 
 Every other example in this folder GENERATES its picture. This one starts from
 someone else's video -- a 1080p stock clip of a dove flapping in place on a
-green screen -- and answers the question people ask first: "can I put my
+green screen -- and answers the question students ask first: "can I put my
 own footage in the dome?"  Yes, in three steps, all in this file:
 
   1. KEY    remove the green, keep an alpha matte              key()
@@ -36,13 +36,22 @@ import cv2
 
 # --------------------------------------------------------------- settings
 SRC     = "source/dove_greenscreen.mkv"
-RES     = 2048          # the delivery size; 1024 while you design
+RES     = 2048          # 4096 for final delivery; 1024 while you design
 FPS     = 30
 SECONDS = 30            # one lap of the room
 MP4     = "EX-10_flight_%dx%d_30fps.mp4" % (RES, RES)
 KEYED   = "EX-10_dove_keyed_alpha.webm"   # the bird alone, with transparency
 
 TILT    = 26.0          # dome tilt in degrees, back raised (Wisdome Malmo)
+FOV     = 160.0         # the venue spreads the whole master over its 160° screen; a 180° file would be squeezed
+
+# Where to put things. The venue counts angles IN THE IMAGE: 0 at the rim,
+# 90 at the centre. Straight ahead, their angle a is at elevation
+#     (90 - TILT) - (1 - a/90) * FOV/2
+SWEET_VENUE = 40.0                                          # their sweet spot, on THEIR scale
+SWEET_EL = (90 - TILT) - (1 - SWEET_VENUE / 90) * FOV / 2   # ...above eye level: about 19.6 deg
+BAND     = ((90 - TILT) - FOV / 2, SWEET_EL + 25)   # comfortable zone, elevation: from the rim at the front (-16) up to about 45
+BAND_AZ  = 60.0                             # ...and this many degrees either side of the front
 
 # where the bird is in the 1920x1080 source (found by scanning every frame for
 # non-green pixels, plus a margin so the wing tips never touch the edge)
@@ -74,7 +83,7 @@ def key(rgb):
 def master_to_room(n):
     """For every pixel of an n x n dome master: its direction in the ROOM.
 
-    Dome master: centre = the dome's zenith, rim = 180 deg across, radius
+    Dome master: centre = the dome's zenith, rim = FOV = 160 deg across, radius
     linear in angle, front of the room at the BOTTOM of the image. The dome
     is tilted, so its zenith is 64 deg up in front of the audience; the dome
     direction is rotated by TILT about the left-right axis to get the room's.
@@ -85,7 +94,7 @@ def master_to_room(n):
     dx, dy = xx - c, yy - c
     r = np.sqrt(dx * dx + dy * dy) / (n / 2.0)
     inside = r <= 1.0
-    th = np.radians(90.0) * np.clip(r, 0, 1)
+    th = np.radians(FOV / 2) * np.clip(r, 0, 1)            # angle from the dome's zenith
     a = np.arctan2(dx, dy)                                  # 0 = bottom = front
     lx, ly, lz = np.sin(th) * np.sin(a), np.sin(th) * np.cos(a), np.cos(th)
     ct, st = math.cos(math.radians(TILT)), math.sin(math.radians(TILT))
@@ -142,9 +151,9 @@ def room_to_master(d):
     x, y, z = d[:, 0], d[:, 1], d[:, 2]
     lx, ly, lz = x, y * ct - z * st, y * st + z * ct
     th = np.arccos(np.clip(lz, -1, 1)); a = np.arctan2(lx, ly)
-    r = th / (np.pi / 2) * (RES / 2.0); c = (RES - 1) / 2.0
+    r = th / np.radians(FOV / 2) * (RES / 2.0); c = (RES - 1) / 2.0
     xy = np.stack([c + r * np.sin(a), c + r * np.cos(a)], -1)
-    return xy, (th <= np.pi / 2) & (xy.min(1) >= 0) & (xy.max(1) < RES)
+    return xy, (th <= np.radians(FOV / 2)) & (xy.min(1) >= 0) & (xy.max(1) < RES)
 
 
 # ------------------------------------------------------- 3. FLY the path
@@ -152,12 +161,13 @@ def flight_path(t):
     """(azimuth, elevation) of the bird at time t, in degrees.
 
     One lap per SECONDS, left to right across the front. Lowest in front
-    (30 deg, inside the comfortable zone), highest behind (48 deg, so it
+    (20 deg, at the sweet spot SWEET_EL, inside the comfortable zone BAND),
+    highest behind (52 deg: the card is about 26 deg tall, so its lower edge
     stays above the 36 deg where the picture starts behind the audience),
     with a slow bob so the flight does not look like a turntable."""
     az = -60.0 + 360.0 * t / SECONDS
     back = 0.5 - 0.5 * math.cos(math.radians(az))              # 0 front, 1 behind
-    el = 30.0 + 18.0 * back + 3.0 * math.sin(2 * math.pi * t / 6.0)
+    el = 20.0 + 32.0 * back + 3.0 * math.sin(2 * math.pi * t / 6.0)
     return az, el
 
 

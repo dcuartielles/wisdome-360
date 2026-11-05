@@ -39,7 +39,7 @@ Run it on the files you are about to upload, not on an earlier version.
 - [ ] File names follow the pattern exactly, including your running-order number.
 - [ ] Track B: the fallback recording exists, meets the spec, and is in the folder.
 - [ ] Track B: `runbook.md` tells a stranger how to start your system in under two minutes.
-- [ ] Track B: you have tested your connection route, either **NDI + Dante** over two Ethernet links or **HDMI** (stereo), and you know which one you will use. See [Connecting a live piece](../reference/connecting.md).
+- [ ] Track B: you have tested your connection: picture over **HDMI** at 3840 × 2160 with the master centred, sound over **Dante** (Dante Virtual Soundcard or the course's Dante box), and a stereo mix ready in case Dante fails. See [Connecting a live piece](../reference/connecting.md).
 
 ## Friday
 
@@ -47,4 +47,4 @@ Run it on the files you are about to upload, not on an earlier version.
 - **Morning:** dry run in the dome, in running order. Note what looks wrong; you can fix small things over lunch.
 - **Afternoon:** presentations. Three minutes per group to explain your decisions, in the dark, in the dome.
 
-Track B: bring your laptop and charger, and either two Ethernet adapters (NDI + Dante) or an HDMI cable, plus the fallback file on a USB stick.
+Track B: bring your laptop and charger, an HDMI cable (and any adapter your laptop needs), an Ethernet port or USB-Ethernet adapter for Dante, and the fallback file on a USB stick.

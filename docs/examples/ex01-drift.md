@@ -31,10 +31,12 @@ The settings are at the top: `RES`, `FRAMES` and `SAMPLES`. Design at `RES = 102
 ```python
 cam.data.type          = 'PANO'
 cam.data.panorama_type = 'FISHEYE_EQUIDISTANT'
-cam.data.fisheye_fov   = radians(180)
+cam.data.fisheye_fov   = radians(FOV)                # FOV = 160, not 180: see below
 cam.rotation_euler     = (radians(180 - 26), 0, 0)   # look up, leaning 26° to the front
 scene.render.resolution_x = scene.render.resolution_y = 2048   # SQUARE
 ```
+
+**`FOV = 160`, not 180.** Wisdome's player spreads the *whole* circle of the master over its 160° screen. A 180° render plays fine, but everything is squeezed towards the centre by 8/9 and lands lower and closer than you placed it. Render the circle at 160° and the angles in your scene are the angles in the room. `FOV` is set once, at the top of `drift.py`, next to `TILT`.
 
 **The rotation is the one everyone gets wrong.** Blender's camera looks down its own −Z. Rotating 180° about X swings it to world +Z, straight up. Rotate 90° instead, the obvious guess, and you render the horizon: it looks fine on a monitor and is completely wrong on a dome.
 
@@ -52,7 +54,14 @@ def place_at(obj, elevation_deg, azimuth_deg, distance):
                     1.6 + distance * sin(e))
 ```
 
-Copy this into every Blender dome project. With the tilted camera, elevation is the audience's (0 = eye level). "Put the subject where people can see it" becomes `-60 <= azimuth_deg <= 60` and `15 <= elevation_deg <= 60`, and the sweet spot is `place_at(obj, 40, 0, d)`. See [Where to put things](../reference/comfortable-zone.md).
+Copy this into every Blender dome project. With the tilted camera, elevation is the audience's (0 = eye level). "Put the subject where people can see it" becomes `-BAND_AZ <= azimuth_deg <= BAND_AZ` and `BAND[0] <= elevation_deg <= BAND[1]` (about ±60° and −16°–45°): a patch in front, not a ring round the room. The sweet spot is `place_at(obj, SWEET_EL, 0, d)`, about 20° up. See [Where to put things](../reference/comfortable-zone.md).
+
+Those constants come from the venue's own scale. Wisdome counts angles **in the image**: 0 at the rim, 90 at the centre. Their sweet spot is "40", and straight ahead that is
+
+```python
+SWEET_EL = (90 - TILT) - (1 - SWEET_VENUE / 90) * FOV / 2   # (90-26) - (50/90)*80 ≈ 19.6°
+BAND     = ((90 - TILT) - FOV / 2, SWEET_EL + 25)           # ≈ −16° (the rim) … 45°
+```
 
 The shards get their height the same way: the script picks the **elevation their tops should reach** and solves for the height, instead of picking a height and hoping.
 
@@ -60,7 +69,7 @@ The shards get their height the same way: the script picks the **elevation their
 
 At the settings this example started with, 1200 frames took nearly four hours on two CPU cores. Now it is about one. Check all three in your own scene before a long render.
 
-1. **There is no floor.** Tilted like the venue, the dome camera sees only about 16° below eye level at the front and starts about 36° up at the back. The ground is almost never on screen, and where it is, it is behind the seat backs. Build the half of the scene that shows.
+1. **There is no floor.** Tilted like the venue, the dome camera sees only about 16° below eye level at the front (the screen edge) and starts about 36° up at the back. The ground is almost never on screen, and where it is, it is behind the seat backs. Build the half of the scene that shows.
 2. **Denoising is off.** Almost every surface is an emission shader seen directly, so there is barely any noise. The denoiser took 7 s a frame on top of a 3 s render. Turn it back on the moment you add real lights, glass, volumetrics or depth of field.
 3. **16 samples, not 50.** On an emissive scene, 8 and 16 samples are hard to tell apart. Render one frame at several sample counts and *look*.
 
@@ -101,7 +110,8 @@ The parallax changes all the time, the framing stays balanced to the last frame,
 | Symptom | Cause |
 |---|---|
 | You see the horizon in a ring, the sky in the middle is empty | Camera rotated 90° instead of 154° |
-| The subject floats over everyone's heads | Placed by XYZ instead of `place_at()`, or elevation over 60° |
+| The subject floats over everyone's heads | Placed by XYZ instead of `place_at()`, or elevation over 45° |
+| Everything sits lower and closer to the centre than you placed it | Fisheye rendered at 180° instead of 160° |
 | The render is very slow and looks the same at fewer samples | Denoising on, too many samples, a floor nobody sees |
 | The last ten seconds fall apart | A dolly that leaves the scene. Render the *last* frame before the sequence |
 

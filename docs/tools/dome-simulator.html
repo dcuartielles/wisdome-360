@@ -9,6 +9,12 @@
   Preview a dome master (square, equidistant fisheye) as it will look inside
   Wisdome Malmö: an 11.6 m dome tilted 26°, raised at the back.
 
+  How Wisdome projects a master: it spreads the WHOLE fisheye circle (r = 1) over
+  its 160° screen, so a pixel at radius r lands r · 80° from the image centre (the
+  dome axis, 64° above eye level straight ahead). Nothing beyond 80° from the axis
+  is screen. Our renders are made at 160°; a 180° file is squeezed (× 8/9) there.
+  The Venue card can switch to the classic 180° mapping to compare.
+
   One file, no libraries, no network. Works from a double-click (file://) in
   Chrome, Edge and Firefox; if your browser refuses screen sharing from a file,
   use the start-simulator script next to this file, which serves it on localhost.
@@ -20,7 +26,10 @@
   Conventions (shared with every example in outputs/06-examples):
     room:  +Y up, -Z = front of the room, +X = the audience's right
     image: bottom edge of the dome master = front, image right = audience right
-    guides: elevation 0 = eye level; comfortable zone = in front, 15–60° up, ±60°
+    guides: elevation 0 = eye level. The venue's own scale: 0 at the rim, 90 at the
+            image centre. Sweet spot = their 40 ≈ 19.6° up, straight ahead.
+            Comfortable zone = in front, from the front rim (≈ −16°) to ≈ 45° up, ±60°.
+    maths mirrors live/lib/dome.js: el = (90 − tilt) − (1 − α/90) · venueFov / 2
 -->
 <style>
   :root { --bg:#06090f; --fg:#f2f5fa; --dim:#8fa3be; --ac:#ff7e4d; --panel:#101725ee;
@@ -121,7 +130,6 @@
       <div class="row"><span>Size</span><input id="cropSize" type="range" min="20" max="100" step="0.1"><output id="cropSizev"></output></div>
       <div class="row"><span>Shift X</span><input id="cropX" type="range" min="-50" max="50" step="0.1"><output id="cropXv"></output></div>
       <div class="row"><span>Shift Y</span><input id="cropY" type="range" min="-50" max="50" step="0.1"><output id="cropYv"></output></div>
-      <div class="row"><span>Fisheye FOV</span><input id="fov" type="range" min="150" max="220" step="1"><output id="fovv"></output></div>
       <div class="row"><input id="mirror" type="checkbox"><label for="mirror">Mirror left / right</label></div>
       <button id="cropReset">Reset crop</button>
     </details>
@@ -129,6 +137,11 @@
 
   <div class="card">
     <details open><summary>Venue</summary>
+      <div class="row"><span>File spreads over</span><select id="vfov" title="How the venue maps the fisheye circle onto the dome" style="margin-top:0">
+        <option value="160">160° (Wisdome)</option>
+        <option value="180">180° (classic dome)</option>
+      </select></div>
+      <p>Wisdome spreads the whole circle of your master over its <b>160°</b> screen. Render at 160°. A 180° file looks squeezed there (× 8/9) and its outer ring is lost. <b>180°</b> shows a classic hemisphere dome, for comparison.</p>
       <div class="row"><span>Dome tilt</span><input id="tilt" type="range" min="0" max="30" step="1"><output id="tiltv"></output></div>
       <div class="row"><span>Front edge</span><input id="front" type="range" min="0" max="359" step="1"><output id="frontv"></output></div>
       <div class="four"><button data-front="0">bottom</button><button data-front="90">right</button><button data-front="180">top</button><button data-front="270">left</button></div>
@@ -162,13 +175,15 @@
       </select>
       <div class="row"><span>Lens</span><input id="camFov" type="range" min="40" max="140" step="1"><output id="camFovv"></output></div>
       <div class="row"><input id="guide" type="checkbox"><label for="guide">Comfortable zone, sweet spot, elevation rings</label></div>
+      <div class="row"><input id="venue" type="checkbox"><label for="venue">Venue scale rings (0 at the rim … 90 at the centre)</label></div>
       <div class="row"><input id="frontMark" type="checkbox"><label for="frontMark">Front marker</label></div>
       <div class="row"><input id="rim" type="checkbox"><label for="rim">Dome rim line</label></div>
       <div class="row"><input id="haze" type="checkbox"><label for="haze">Simulate cross-reflection (approx.)</label></div>
       <div id="legend">
         <span><i style="background:var(--ok)"></i>comfortable zone</span>
         <span><i style="background:var(--warn)"></i>sweet spot</span>
-        <span><i style="background:#7390ff"></i>15° rings</span>
+        <span><i style="background:#7390ff"></i>15° rings (eye level orange)</span>
+        <span><i style="background:#ff73d9"></i>venue scale, every 10 (40 thick)</span>
         <span><i style="background:var(--ac)"></i>front</span>
       </div>
       <div class="two">
@@ -209,9 +224,23 @@ const D2R = Math.PI / 180;
 const DOME_R = 5.8;                       // 11.6 m dome
 
 /* ------------------------------------------------------------------ settings */
-const DEF = { tilt:26, front:0, mirror:false, fov:180, cropSize:100, cropX:0, cropY:0,
+/* Venue geometry (same names and maths as live/lib/dome.js).
+   FILE   how we render the master: FILE_FOV = 160 (the test card is drawn like this).
+   VENUE  how Wisdome projects it: the whole circle over vfov (160) degrees, tilted, with
+          a physical screen ("the rim") vfov degrees across. */
+const FILE_FOV = 160;
+const SWEET_VENUE = 40;     // venue's sweet spot on THEIR scale (0 = rim, 90 = image centre)
+const BAND_ABOVE = 25;      // comfortable zone: from the front rim up to sweet + 25° (≈ 45°)
+const BAND_AZ = 60;         // …and ± this many degrees to either side of the front
+const SWEET_SIZE = 12;      // radius of the sweet-spot circle, degrees
+/** venue angle (their scale) -> room elevation straight ahead */
+const venueToEl = (alpha, tilt = S.tilt, vfov = S.vfov) => (90 - tilt) - (1 - alpha / 90) * vfov / 2;
+const sweetEl = () => venueToEl(SWEET_VENUE);
+const band = () => [venueToEl(0), sweetEl() + BAND_ABOVE];      // [front rim, ≈ 45°]
+
+const DEF = { tilt:26, vfov:160, front:0, mirror:false, cropSize:100, cropX:0, cropY:0,
               seat:'ref', ex:0, ey:0, ez:0, view:'inset', camFov:90,
-              guide:true, frontMark:true, rim:true, haze:false, camres:'1080' };
+              guide:true, venue:true, frontMark:true, rim:true, haze:false, camres:'1080' };
 const SEATS = {                           // metres from the dome centre, approximate
   ref:   [ 0.0,  0.0,  0.0],
   front: [ 0.0, -0.9, -2.6],
@@ -219,7 +248,7 @@ const SEATS = {                           // metres from the dome centre, approx
   back:  [ 0.0,  1.1,  3.0],
   side:  [-2.6,  1.0,  2.4] };
 const SEAT_KEYS = ['ref','front','mid','back','side'];
-const KEY = 'dome-simulator-v1';
+const KEY = 'dome-simulator-v2';     // v2: 160° venue mapping (v1 settings assumed 180°)
 let S = { ...DEF };
 try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
 let saveT = 0;
@@ -227,13 +256,13 @@ function save(){ clearTimeout(saveT); saveT = setTimeout(() => {
   try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }, 300); }
 
 const fmt = {
-  tilt: v => v + '°', fov: v => v + '°', camFov: v => v + '°',
+  tilt: v => v + '°', camFov: v => v + '°',
   cropSize: v => (+v).toFixed(0) + '%', cropX: v => (+v).toFixed(1), cropY: v => (+v).toFixed(1),
   ex: v => (+v).toFixed(2), ey: v => (+v).toFixed(2), ez: v => (+v).toFixed(2),
   front: v => { const n = {0:'bottom',90:'right',180:'top',270:'left'}[v]; return n || v + '°'; } };
-const ranges = ['tilt','front','fov','cropSize','cropX','cropY','ex','ey','ez','camFov'];
-const checks = ['mirror','guide','frontMark','rim','haze'];
-const selects = ['seat','view','camres'];
+const ranges = ['tilt','front','cropSize','cropX','cropY','ex','ey','ez','camFov'];
+const checks = ['mirror','guide','venue','frontMark','rim','haze'];
+const selects = ['seat','view','camres','vfov'];
 
 function syncUI(){
   for (const k of ranges) { $(k).value = S[k]; $(k + 'v').textContent = fmt[k](S[k]); }
@@ -250,10 +279,11 @@ for (const k of ranges) $(k).addEventListener('input', e => {
 for (const k of checks) $(k).addEventListener('change', e => { S[k] = e.target.checked; save(); });
 $('view').addEventListener('change', e => { S.view = e.target.value; save(); });
 $('camres').addEventListener('change', e => { S.camres = e.target.value; save(); });
+$('vfov').addEventListener('change', e => { S.vfov = +e.target.value; save(); });
 $('seat').addEventListener('change', e => setSeat(e.target.value));
 document.querySelectorAll('[data-front]').forEach(b => b.addEventListener('click', () => {
   S.front = +b.dataset.front; syncUI(); save(); }));
-$('cropReset').addEventListener('click', () => { S.cropSize = 100; S.cropX = 0; S.cropY = 0; S.mirror = false; S.fov = 180; syncUI(); save(); });
+$('cropReset').addEventListener('click', () => { S.cropSize = 100; S.cropX = 0; S.cropY = 0; S.mirror = false; syncUI(); save(); });
 $('defaults').addEventListener('click', () => { const r = S.camres; S = { ...DEF, camres:r }; syncUI(); save(); lookSweet(); });
 
 function setSeat(k){
@@ -287,11 +317,14 @@ uniform mat3  uCam;        // camera -> room
 uniform float uTanHalf;    // tan(vertical lens fov / 2)
 uniform float uTilt;       // radians, zenith leans towards the front (-Z)
 uniform float uRot;        // radians, which image edge is the front
-uniform float uHalfFov;    // radians, half the fisheye field of view
+uniform float uHalfFov;    // radians, half the angle the VENUE spreads the master's circle over (Wisdome: 80°)
+uniform float uHalfOpen;   // radians, half the physical screen (Wisdome: 80°); beyond it is room, not picture
+uniform float uSweet;      // sweet spot, degrees above eye level straight ahead (their 40)
+uniform vec3  uBand;       // comfortable zone: el from, el to, ± az (degrees)
 uniform float uMirror;
 uniform vec4  uCrop;       // texture-space crop: offset.xy, size.zw (top-down)
 uniform sampler2D uTex;
-uniform float uHasTex, uGuide, uFrontMark, uRim, uHaze;
+uniform float uHasTex, uGuide, uVenue, uFrontMark, uRim, uHaze;
 uniform float uR;
 out vec4 o;
 const float PI = 3.14159265359;
@@ -306,17 +339,29 @@ vec2 cropUV(vec2 uv){
   if (uMirror > 0.5) uv.x = 1.0 - uv.x;
   return uCrop.xy + uv * uCrop.zw; }
 
-// dome direction (y = dome zenith) -> colour from the dome master
+// dome direction (y = dome axis = image centre) -> colour from the dome master
 vec3 master(vec3 d){
-  float th = acos(clamp(d.y, -1.0, 1.0));      // angle from the dome zenith
+  float th = acos(clamp(d.y, -1.0, 1.0));      // angle from the dome axis
   float A  = atan(d.x, -d.z) + uRot;            // 0 = front edge of the image
-  float r  = th / uHalfFov;                     // equidistant: linear in angle
-  if (r > 1.0 || uHasTex < 0.5) return vec3(0.0);
+  float r  = th / uHalfFov;                     // equidistant: r = 1 lands uHalfFov from the axis (80° at Wisdome)
+  if (r > 1.0 || th > uHalfOpen || uHasTex < 0.5) return vec3(0.0);
   vec2 uv = vec2(0.5 + 0.5*r*sin(A), 0.5 + 0.5*r*cos(A));   // bottom = front
   return texture(uTex, cropUV(uv)).rgb;
 }
 
+// the venue's own scale, in the FILE: alpha = 90 (1 - r); 0 at the rim, 90 at the image centre.
+// Rings every 10 of their degrees, their 40 (the sweet spot) thicker. px = line width in real degrees.
+vec3 venueRings(vec3 col, float r, float px){
+  if (uVenue < 0.5 || r > 1.0) return col;
+  float alpha = (1.0 - r) * 90.0;
+  float d = abs(fract(alpha / 10.0 + 0.5) - 0.5) * 10.0;     // their degrees to the nearest ring
+  float dd = d * degrees(uHalfFov) / 90.0;                    // …in real degrees on the dome
+  float w = abs(alpha - 40.0) < 5.0 ? px * 2.4 : px * 1.2;
+  return mix(col, vec3(1.0, 0.45, 0.85), (1.0 - smoothstep(w * 0.5, w, dd)) * 0.85);
+}
+
 // the course's guides, in the audience's angles (q = direction in the room)
+float gScreen = 1.0;    // 0 where the ray hits the room beyond the rim: no zone tint there
 vec3 guides(vec3 col, vec3 q, float px){
   float e  = degrees(asin(clamp(q.y, -1.0, 1.0)));
   float az = degrees(atan(q.x, -q.z));
@@ -324,16 +369,17 @@ vec3 guides(vec3 col, vec3 q, float px){
   float w = px;                                   // line half-width in degrees
   if (uGuide > 0.5) {
     float g = 0.0;
-    for (int i = 0; i < 6; i++) { float t = float(i) * 15.0;
+    for (int i = -1; i < 6; i++) { float t = float(i) * 15.0;
       g = max(g, 1.0 - smoothstep(0.0, w, abs(e - t))); }
     col = mix(col, vec3(0.45, 0.56, 1.0), g * 0.45);
-    float zone = step(15.0, e) * step(e, 60.0) * step(aaz, 60.0);
-    col = mix(col, col + vec3(0.05, 0.10, 0.06), zone);
-    float edge = max(
-      max(1.0 - smoothstep(0.0, w*1.4, abs(e - 15.0)), 1.0 - smoothstep(0.0, w*1.4, abs(e - 60.0))) * step(aaz, 60.0),
-      (1.0 - smoothstep(0.0, w*1.4, abs(aaz - 60.0) * cos(radians(e)))) * step(15.0, e) * step(e, 60.0));
+    col = mix(col, vec3(1.0, 0.55, 0.2), (1.0 - smoothstep(0.0, w*1.4, abs(e))) * 0.8);   // eye level
+    float zone = step(uBand.x, e) * step(e, uBand.y) * step(aaz, uBand.z);
+    col = mix(col, col + vec3(0.05, 0.10, 0.06), zone * gScreen);
+    float edge = gScreen * max(
+      max(1.0 - smoothstep(0.0, w*1.4, abs(e - uBand.x)), 1.0 - smoothstep(0.0, w*1.4, abs(e - uBand.y))) * step(aaz, uBand.z),
+      (1.0 - smoothstep(0.0, w*1.4, abs(aaz - uBand.z) * cos(radians(e)))) * step(uBand.x, e) * step(e, uBand.y));
     col = mix(col, vec3(0.35, 0.95, 0.55), edge * 0.9);
-    vec3 sweet = vec3(0.0, sin(radians(40.0)), -cos(radians(40.0)));
+    vec3 sweet = vec3(0.0, sin(radians(uSweet)), -cos(radians(uSweet)));
     float a = degrees(acos(clamp(dot(q, sweet), -1.0, 1.0)));
     col = mix(col, vec3(1.0, 0.85, 0.30), 1.0 - smoothstep(0.0, w*1.6, abs(a - 12.0)));
     col = mix(col, vec3(1.0, 0.85, 0.30), 1.0 - smoothstep(w*2.0, w*3.0, a));
@@ -358,18 +404,21 @@ void main(){
     vec3 P  = uEye + s * rd;
     vec3 dl = roomToDome(P / uR);
     float px = degrees(2.0 * uTanHalf / uView.w) * 1.2;      // ~1 pixel in degrees
-    if (dl.y >= 0.0) {
+    float th = acos(clamp(dl.y, -1.0, 1.0));                 // angle from the dome axis
+    if (th <= uHalfOpen) {
       col = master(dl);
+      col = venueRings(col, th / uHalfFov, px * s / uR);       // px is per unit distance; rings live on the surface
       if (uHaze > 0.5 && uHasTex > 0.5) {
         // a dome lights itself: every point also receives a share of the whole picture
         vec3 avg = textureLod(uTex, uCrop.xy + uCrop.zw*0.5, 14.0).rgb / 0.785;
         col += 0.22 * avg;
       }
     } else {
-      // below the dome's rim: walls, seats, people
-      col = vec3(0.028, 0.036, 0.05) * (0.7 + 0.3 * smoothstep(-0.6, 0.0, dl.y));
+      // beyond the screen's edge (the rim): walls, seats, people — never picture
+      col = vec3(0.028, 0.036, 0.05) * (0.7 + 0.3 * (1.0 - smoothstep(0.0, 0.6, th - uHalfOpen)));
     }
-    if (uRim > 0.5) col = mix(col, vec3(0.22, 0.30, 0.44), 1.0 - smoothstep(0.0, radians(px) * 1.5, abs(dl.y)));
+    if (uRim > 0.5) col = mix(col, vec3(0.22, 0.30, 0.44), 1.0 - smoothstep(0.0, radians(px) * 1.5, abs(th - uHalfOpen)));
+    gScreen = step(th, uHalfOpen);
     col = guides(col, rd, px);
   } else {
     // ---- the dome master itself, as a flat square, guides measured from the dome centre
@@ -383,10 +432,11 @@ void main(){
     else {
       float th = r * uHalfFov, Ad = atan(p.x, -p.y) - uRot;
       vec3 dl = vec3(sin(th)*sin(Ad), cos(th), -sin(th)*cos(Ad));
-      if (dl.y < 0.0) col *= 0.35;                        // beyond the rim (fisheye wider than 180°)
+      if (th > uHalfOpen) col *= 0.35;                    // lands beyond the screen's edge: never seen
       float pxd = degrees(uHalfFov) / (side * 0.5) * 1.2;
+      col = venueRings(col, r, pxd);
       col = guides(col, domeToRoom(dl), pxd);
-      if (uRim > 0.5) col = mix(col, vec3(0.22, 0.30, 0.44), 1.0 - smoothstep(0.0, 1.5/(side*0.5), abs(r - min(1.0, 0.5*PI/uHalfFov))));
+      if (uRim > 0.5) col = mix(col, vec3(0.22, 0.30, 0.44), 1.0 - smoothstep(0.0, 1.5/(side*0.5), abs(r - min(1.0, uHalfOpen/uHalfFov))));
     }
   }
   o = vec4(col, 1.0);
@@ -403,8 +453,8 @@ gl.linkProgram(prog);
 if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
 gl.useProgram(prog);
 const U = {};
-for (const n of ['uView','uMode','uEye','uCam','uTanHalf','uTilt','uRot','uHalfFov','uMirror','uCrop',
-                 'uTex','uHasTex','uGuide','uFrontMark','uRim','uHaze','uR'])
+for (const n of ['uView','uMode','uEye','uCam','uTanHalf','uTilt','uRot','uHalfFov','uHalfOpen','uSweet','uBand',
+                 'uMirror','uCrop','uTex','uHasTex','uGuide','uVenue','uFrontMark','uRim','uHaze','uR'])
   U[n] = gl.getUniformLocation(prog, n);
 gl.bindVertexArray(gl.createVertexArray());
 
@@ -639,10 +689,13 @@ $('seek').addEventListener('input', e => { if (src?.file && src.el.duration) {
 $('seek').addEventListener('change', () => seeking = false);
 const mmss = t => Math.floor(t/60) + ':' + String(Math.floor(t%60)).padStart(2,'0');
 
-/* built-in test card: the course grid, drawn in the dome's angles, zone in the room's */
+/* built-in test card: a 160° master (the way we render), drawn for the current tilt.
+   Grey rings = the venue's scale (0 at the rim … 90 at the centre); zone and sweet spot in the room's angles. */
 function loadTestCard(){
   const N = 2048, c = document.createElement('canvas'); c.width = c.height = N;
   const x = c.getContext('2d'), C = N/2, t = S.tilt * D2R;
+  const tc = a => (90 - S.tilt) - (1 - a / 90) * FILE_FOV / 2;         // venueToEl for the FILE
+  const sw = tc(SWEET_VENUE), bd = [tc(0), sw + BAND_ABOVE];
   x.fillStyle = '#06090f'; x.fillRect(0,0,N,N);
   x.save(); x.beginPath(); x.arc(C,C,C,0,7); x.clip();
   const g = x.createRadialGradient(C,C*1.5,0,C,C,C);
@@ -650,44 +703,46 @@ function loadTestCard(){
   const toXY = (az, el) => {                    // room angles -> image pixel (bottom = front)
     const X = Math.cos(el*D2R)*Math.sin(az*D2R), Y = Math.cos(el*D2R)*Math.cos(az*D2R), Z = Math.sin(el*D2R);
     const ly = Y*Math.cos(t) - Z*Math.sin(t), lz = Y*Math.sin(t) + Z*Math.cos(t);
-    const r = Math.acos(Math.max(-1, Math.min(1, lz))) / (Math.PI/2), a = Math.atan2(X, ly);
+    const r = Math.acos(Math.max(-1, Math.min(1, lz))) / (FILE_FOV / 2 * D2R), a = Math.atan2(X, ly);
     return [C + Math.sin(a)*r*C, C + Math.cos(a)*r*C];
   };
   const path = pts => { x.beginPath(); pts.forEach(([az,el],i) => { const [px,py] = toXY(az,el); i ? x.lineTo(px,py) : x.moveTo(px,py); }); };
   x.lineWidth = 3; x.strokeStyle = '#3a4a66';
-  for (let e = 0; e < 90; e += 15) { x.beginPath(); x.arc(C,C,C*(1-e/90),0,7); x.stroke(); }
+  for (let e = 0; e < 90; e += 10) { x.beginPath(); x.arc(C,C,C*(1-e/90),0,7); x.stroke(); }
   x.strokeStyle = '#2b3850';
   for (let a = 0; a < 360; a += 15) { const r = a*D2R; x.beginPath(); x.moveTo(C,C); x.lineTo(C+Math.sin(r)*C, C+Math.cos(r)*C); x.stroke(); }
-  const zone = [];
-  for (let a=-60;a<=60;a+=2) zone.push([a,15]);
-  for (let e=15;e<=60;e+=2) zone.push([60,e]);
-  for (let a=60;a>=-60;a-=2) zone.push([a,60]);
-  for (let e=60;e>=15;e-=2) zone.push([-60,e]);
+  x.strokeStyle = '#2f4e8a'; x.lineWidth = 4;                       // eye level, as the room sees it
+  path(Array.from({length:181}, (_, i) => [i*2 - 180, 0])); x.stroke();
+  const zone = [], [z0, z1] = bd;
+  for (let a=-BAND_AZ;a<=BAND_AZ;a+=2) zone.push([a,z0]);
+  for (let e=z0;e<=z1;e+=2) zone.push([BAND_AZ,e]);
+  for (let a=BAND_AZ;a>=-BAND_AZ;a-=2) zone.push([a,z1]);
+  for (let e=z1;e>=z0;e-=2) zone.push([-BAND_AZ,e]);
   path(zone); x.closePath(); x.fillStyle = 'rgba(90,240,140,.14)'; x.fill();
   x.strokeStyle = '#5af08c'; x.lineWidth = 5; x.stroke();
   // checkerboard patch at the sweet spot, to judge sharpness and distortion
   for (let i=-4;i<4;i++) for (let j=-3;j<3;j++) if ((i+j)&1) {
-    path([[i*3,40+j*3],[i*3+3,40+j*3],[i*3+3,43+j*3],[i*3,43+j*3]]); x.closePath();
+    path([[i*3,sw+j*3],[i*3+3,sw+j*3],[i*3+3,sw+3+j*3],[i*3,sw+3+j*3]]); x.closePath();
     x.fillStyle = '#e8edf5'; x.fill(); }
   x.fillStyle = '#ff7e4d'; x.textAlign = 'center'; x.textBaseline = 'middle';
   x.font = `bold ${N*0.036}px system-ui`;
-  const lab = [[0,8,'FRONT'],[90,8,'RIGHT'],[180,40,'BACK'],[-90,8,'LEFT']];
+  const lab = [[0,-9,'FRONT'],[90,22,'RIGHT'],[180,50,'BACK'],[-90,22,'LEFT']];
   for (const [az,el,s] of lab) { const [px,py] = toXY(az,el); x.fillText(s, px, py); }
-  x.fillStyle = '#8fa3be'; x.font = `bold ${N*0.026}px system-ui`;
-  for (let e = 15; e <= 60; e += 15) { const [px,py] = toXY(-75, e); x.fillText(e+'°', px, py); }
+  x.fillStyle = '#8fa3be'; x.font = `bold ${N*0.024}px system-ui`;     // the venue's scale, up the back meridian
+  for (let a = 10; a <= 80; a += 10) x.fillText(a, C, C - C*(1 - a/90) + N*0.018);
   x.fillStyle = '#5af08c'; x.font = `bold ${N*0.024}px system-ui`;
-  { const [px,py] = toXY(0, 55); x.fillText('COMFORTABLE ZONE', px, py); }
+  { const [px,py] = toXY(0, z1 - 6); x.fillText('COMFORTABLE ZONE', px, py); }
   x.fillStyle = '#ffd84d';
-  { const [px,py] = toXY(0, 31); x.fillText('SWEET SPOT', px, py); }
-  x.fillStyle = '#4b5d7e'; x.font = `bold ${N*0.02}px system-ui`; x.fillText('ZENITH OF THE DOME', C, C);
+  { const [px,py] = toXY(0, sw - 14); x.fillText('SWEET SPOT · 40', px, py); }
+  x.fillStyle = '#4b5d7e'; x.font = `bold ${N*0.02}px system-ui`; x.fillText(`DOME AXIS · ${90 - S.tilt}° UP`, C, C);
   x.restore();
   useStill(c, `test card (tilt ${S.tilt}°)`, { testcard:true });
 }
 $('demo').addEventListener('click', () => { loadTestCard(); say(''); });
 
 /* ------------------------------------------------------------------ camera */
-let yaw = 0, pitch = 40 * D2R, wantShot = false;
-function lookSweet(){ yaw = 0; pitch = 40 * D2R; }
+let yaw = 0, pitch = sweetEl() * D2R, wantShot = false;
+function lookSweet(){ yaw = 0; pitch = sweetEl() * D2R; }
 let drag = null;
 canvas.addEventListener('pointerdown', e => { drag = { x:e.clientX, y:e.clientY }; canvas.setPointerCapture(e.pointerId); canvas.classList.add('drag');
   if (src?.kind === 'video' && src.el.paused && !src.file) src.el.play(); });
@@ -781,7 +836,11 @@ function frame(now){
   gl.uniform1f(U.uTanHalf, Math.tan(S.camFov * D2R / 2));
   gl.uniform1f(U.uTilt, S.tilt * D2R);
   gl.uniform1f(U.uRot, S.front * D2R);
-  gl.uniform1f(U.uHalfFov, S.fov * D2R / 2);
+  gl.uniform1f(U.uHalfFov, S.vfov * D2R / 2);         // the venue spreads the circle over vfov
+  gl.uniform1f(U.uHalfOpen, S.vfov * D2R / 2);        // …and that is also where its screen ends
+  gl.uniform1f(U.uSweet, sweetEl());
+  { const b = band(); gl.uniform3f(U.uBand, b[0], b[1], BAND_AZ); }
+  gl.uniform1f(U.uVenue, S.venue ? 1 : 0);
   gl.uniform1f(U.uMirror, S.mirror ? 1 : 0);
   gl.uniform4fv(U.uCrop, cropRect());
   gl.uniform1f(U.uHasTex, has ? 1 : 0);
@@ -843,6 +902,7 @@ function hud(){
   if (side < 2048) warn.push(`below 2048² — fine for composition, soft for detail`);
   if (src.kind === 'video' && srcFps > 0 && srcFps < 24 && !src.el.paused) warn.push('low frame rate');
   if (src.kind === 'ndi' && ndiInfo && srcFps > 0 && srcFps < ndiInfo.fps * 0.8) warn.push('dropping frames (this computer is the bottleneck — try the bridge with --half)');
+  if (S.vfov !== 160) warn.unshift(`venue mapping ${S.vfov}° (classic dome) — Wisdome spreads the file over 160°`);
   if (S.seat !== 'ref') warn.unshift(`seat: ${$('seat').selectedOptions[0].textContent} — guides measured from here (press 1 for the reference seat)`);
   h.innerHTML = parts.join(' · ') + (warn.length ? ' · <span class="w">' + warn.join(' · ') + '</span>' : '');
 }

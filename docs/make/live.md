@@ -16,32 +16,33 @@ Your laptop draws the dome master in real time and is plugged into the dome. The
 | Gentle creative coding in a browser | **EX-04 Chorus** (p5.js) |
 | Fly through space, real astronomy data | **EX-07** (OpenSpace) |
 
-## 2. Choose how you connect
+## 2. How you connect
 
-Decide this early, because it decides your sound. [Connecting a live piece](../reference/connecting.md) has the details.
+The picture goes over **HDMI**, the sound over **Dante** in 5.1. [Connecting a live piece](../reference/connecting.md) has the details.
 
-| | Picture | Sound | Cables |
-|---|---|---|---|
-| **NDI + Dante** | NDI | Dante, **5.1** | Two Ethernet links |
-| **HDMI** | HDMI | Same cable, **stereo only** | One HDMI cable |
+| | How | What you need |
+|---|---|---|
+| **Picture** | HDMI at 3840 × 2160, the dome master centred as a 2160² square | An HDMI output, and OBS or your tool's fullscreen output |
+| **Sound** | Dante, 6 channels in 5.1 | Dante Virtual Soundcard (paid) or a hardware Dante interface, and an Ethernet port |
+| **Fallback** | Sound inside the HDMI cable | A stereo mix of your piece |
 
 ## 3. Rehearse on your laptop
 
 Get your live output into the [Dome Simulator](../tools/dome-simulator.html). The [setup wizard](../setup/wizard.html) picks the steps for your laptop.
 
-| Route | How | When |
+| Way in | How | When |
 |---|---|---|
 | **Share a window** | Simulator → *Share a screen, window or tab* | Always works; start here |
 | **Virtual Dome monitor** | A second, invisible 2048² screen your tool goes fullscreen on | Cleaner picture, closest to a real output |
-| **NDI bridge** | Your tool sends NDI; the bridge passes it to the simulator | Rehearses the NDI + Dante route |
-| **Capture card** | Your HDMI output goes into a USB capture card | Rehearses the HDMI route |
+| **Capture card** | Your HDMI output goes into a USB capture card | Rehearses the real HDMI picture, at the real resolution |
 
 ## 4. Before the day
 
-- Test your connection route with the same laptop, cables and adapters you will bring.
-- NDI + Dante: sending Dante from a laptop needs Dante Virtual Soundcard (paid) or a hardware Dante interface. Sort that out early.
-- HDMI: make a stereo mix if your sound was planned in 5.1.
+- Test with the same laptop, cables and adapters you will bring. Check the HDMI output really runs at 3840 × 2160.
+- Sort out your Dante sender early: Dante Virtual Soundcard or a hardware Dante interface.
+- Picture and sound travel separately: check in the room that they line up.
+- Keep a stereo mix ready, in case you have to send the sound over HDMI.
 - Write `runbook.md`: how a stranger starts your system in under two minutes.
 - Record a **fallback**: your piece running, converted to the [delivery spec](../reference/delivery-spec.md).
 
-MaU students: the fallback and runbook deadlines are on [Hand-in](../course/hand-in.md).
+MaU students: the fallback and runbook deadlines are on [Hand-in](../course/hand-in.md), and the course has a Dante box you can use.
