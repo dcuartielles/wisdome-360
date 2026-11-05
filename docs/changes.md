@@ -6,9 +6,13 @@ title: What changed
 
 Every change to this site is listed here, newest first, grouped by release. If something you relied on moved, it is in this list. Each release is also on the [Releases page](https://github.com/dcuartielles/wisdome-360/releases) of the repository.
 
-## v0.0.2 — not released yet
+## v0.0.3 — not released yet
 
-Changes since the first release, *protoclass*. They are already on this site.
+Changes since v0.0.2, *venue*. They are already on this site.
+
+## v0.0.2 "venue" — 2026-11-06
+
+The corrections from the venue: 160° geometry, live pieces over HDMI and Dante, the Friday hand-in in teams, and two new examples.
 
 ### 2026-11-05
 
