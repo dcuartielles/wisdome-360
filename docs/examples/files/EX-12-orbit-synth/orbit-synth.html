@@ -1,0 +1,1406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Orbit synth — live dome</title>
+<!--
+  EX-12 Orbit synth: the dome as an instrument, with its own synthesiser.
+  Copyright (C) 2026 David Cuartielles and contributors. Licence: GPL-3.0-or-later.
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. https://www.gnu.org/licenses/gpl-3.0.html
+
+  One file, no libraries, no server. Open it from disk or from a web server.
+  The picture is one fragment shader (a ray-traced dome master, fisheye 160°, tilt 26°).
+  The sound is ONE AudioWorklet synthesiser; this page only sends it note messages.
+  The worklet's code is in the <script id="worklet-src"> block below (and, to read, in
+  synth-worklet.js next to this file). It is loaded from a Blob URL (served over http/https) or a
+  data: URL (opened from disk), because Chrome refuses audioWorklet.addModule() on a file:// URL.
+-->
+<style>
+:root{--bg:#06090f;--fg:#f2f5fa;--dim:#8fa3be;--ac:#ff7e4d;--panel:#101725;--line:#24314a}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
+#stage{position:fixed;inset:0;display:grid;place-items:center;background:#000}
+canvas{display:block;background:#000;cursor:crosshair;touch-action:none}
+body.idle canvas{cursor:none}
+#ui{position:fixed;top:0;left:0;padding:14px;width:min(340px,94vw);z-index:5;
+  max-height:100vh;overflow:auto}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  padding:13px 14px;margin-bottom:9px}
+h1{font-size:14px;margin:0;letter-spacing:.14em;text-transform:uppercase;color:var(--ac)}
+h2{font-size:11px;margin:0 0 2px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);font-weight:600}
+p{font-size:12px;line-height:1.5;color:var(--dim);margin:6px 0 0}
+button{width:100%;margin-top:7px;padding:9px;border-radius:8px;cursor:pointer;
+  background:#1a2434;color:var(--fg);border:1px solid var(--line);font-size:13px}
+button.primary{background:var(--ac);color:#16202e;border-color:var(--ac);font-weight:700}
+.two,.three{display:grid;gap:0 7px}
+.two{grid-template-columns:1fr 1fr}.three{grid-template-columns:1fr 1fr 1fr}
+.three button{font-size:12px;padding:8px 4px}
+.row{display:flex;gap:8px;align-items:center;margin-top:9px;font-size:12px;color:var(--dim)}
+.row label{flex:0 0 46%}
+.row input[type=range]{flex:1;min-width:0;accent-color:var(--ac)}
+.row span.v{width:44px;text-align:right;color:var(--fg);font-variant-numeric:tabular-nums}
+.row select{flex:1;min-width:0;background:#1a2434;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:4px}
+.row input[type=checkbox]{accent-color:var(--ac)}
+#msg{font-size:11.5px;color:var(--ac);margin-top:7px;min-height:1em}
+#hud{font-size:11.5px;color:var(--fg);margin-top:7px;font-variant-numeric:tabular-nums;line-height:1.5}
+details summary{cursor:pointer;font-size:12px;color:var(--dim)}
+kbd{background:#1a2434;border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:11px}
+.hidden{display:none!important}
+#toggle{position:fixed;right:12px;top:12px;width:auto;margin:0;padding:7px 11px;z-index:6}
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="c"></canvas></div>
+<button id="toggle">hide</button>
+
+<div id="ui">
+  <div class="card">
+    <h1>Orbit synth</h1>
+    <p>Three spheres of mesh orbit in a void: a keyboard, drums and a guitar. Readers circle and hum;
+       lines are notes. Every sound comes from <b>one AudioWorklet synthesiser</b>.</p>
+    <button id="start" class="primary">Start sound</button>
+    <div class="two">
+      <button id="dome">Dome output (fullscreen)</button>
+      <button id="shot">Save PNG dome master</button>
+    </div>
+    <div id="msg"></div>
+    <div id="hud"></div>
+  </div>
+
+  <div class="card">
+    <h2>Play</h2>
+    <div class="two">
+      <button data-press="flyout">Fly out</button>
+      <button data-press="step">Next line(s) now</button>
+    </div>
+    <div class="three">
+      <button data-press="in0">Into keyboard</button>
+      <button data-press="in1">Into drums</button>
+      <button data-press="in2">Into guitar</button>
+    </div>
+    <div class="two">
+      <button data-press="clear">Clear my notes</button>
+      <button id="restart">Restart (R)</button>
+    </div>
+    <p>Click a cell: a line. Click a line: another reader. <kbd>Shift</kbd>-click a line: remove it.
+       <kbd>Shift</kbd> + drag: turn a sphere. Double-click a sphere from outside: fly into it.</p>
+  </div>
+
+  <div class="card">
+    <h2>Stress test</h2>
+    <div id="p-stress"></div>
+    <p>Raise the lines until <b>real-time</b> drops below about 98 % or the picture stutters: that is this computer's limit.</p>
+  </div>
+
+  <div class="card">
+    <details>
+      <summary>More settings</summary>
+      <div class="row"><label for="quality">Picture size</label>
+        <select id="quality">
+          <option value="512">512²</option><option value="768">768²</option><option value="1024">1024² (default)</option>
+          <option value="1536">1536²</option><option value="2048">2048²</option><option value="2160">2160² (dome display)</option>
+        </select></div>
+      <div id="p-more"></div>
+    </details>
+    <p><kbd>G</kbd> comfortable zone &amp; sweet spot &middot; <kbd>F</kbd> front &amp; rim &middot; <kbd>I</kbd> HUD on the dome &middot;
+       <kbd>O</kbd> fly out &middot; <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> into a sphere &middot; <kbd>N</kbd> next line &middot;
+       <kbd>C</kbd> clear &middot; <kbd>R</kbd> restart &middot; <kbd>H</kbd> hide panel &middot; <kbd>Esc</kbd> leave fullscreen</p>
+  </div>
+</div>
+
+<!-- The synthesiser. The same code as synth-worklet.js; it runs on the audio thread. -->
+<script id="worklet-src" type="text/plain">
+// EX-12 Orbit synth: the synthesiser (an AudioWorklet).
+// Copyright (C) 2026 David Cuartielles and contributors. Licence: GPL-3.0-or-later.
+// This program is free software: you can redistribute it and/or modify it under the terms of the
+// GNU General Public License as published by the Free Software Foundation, either version 3 of the
+// License, or (at your option) any later version. https://www.gnu.org/licenses/gpl-3.0.html
+//
+// This file is for READING. orbit-synth.html carries the same code inside it and loads it from a
+// Blob URL (or a data: URL when the page is opened from disk), because Chrome refuses
+// audioWorklet.addModule() on a file:// URL. If you change the synth, change it in
+// orbit-synth.html (the <script id="worklet-src"> block).
+//
+// ONE AudioWorkletNode makes every sound of the instrument: notes (keyboard, drums, guitar),
+// hums, 5.1 panning and a limiter, all as plain arithmetic on the audio thread. The page only
+// sends messages: "play this note at this time, with these six speaker gains" and "these hums
+// should sound like this now".
+//
+// Why: in EX-11 every note is a little graph of Web Audio nodes (oscillators, gains, filters,
+// a panner). The browser handles a few hundred of those at once. Here a voice is a few numbers in
+// an array, so the limit is how much arithmetic fits in 2.7 ms (128 samples at 48 kHz): thousands
+// of simple voices on a laptop.
+//
+// Messages in:  { type: 'notes', list: [{ when, bank, kind, f, len, vol, g: [6], line }] }
+//               { type: 'hums',  list: [{ id, bank, f, gain, g: [6] }] }   (missing ids fade out)
+//               { type: 'reset' }
+// Messages out: { voices, hums, peak, reduction (dB), notesPerSec } about 4 times a second.
+//
+// Output: six channels in the order L R C LFE Ls Rs, or, when the node is made with two output
+// channels (a stereo device), the same mix folded down to L R inside the synth, before the limiter.
+
+const TAU = Math.PI * 2;
+const MAX_VOICES = 2048;
+// speed: a sine table (phase 0..1, linear interpolation) and a rational tanh are much cheaper than
+// Math.sin / Math.tanh, and inaudibly different here
+const SN = 4096, SIN = new Float32Array(SN + 1);
+for (let i = 0; i <= SN; i++) SIN[i] = Math.sin(TAU * i / SN);
+const sinT = (p) => { const x = p * SN, i = x | 0; return SIN[i] + (SIN[i + 1] - SIN[i]) * (x - i); };
+const ftanh = (x) => (x > 3 ? 1 : x < -3 ? -1 : x * (27 + x * x) / (27 + 9 * x * x));
+
+// a cheap state-variable filter (Zavalishin's TPT form): lp / bp / hp from one structure
+class SVF {
+  constructor(f, q, mode) { this.ic1 = 0; this.ic2 = 0; this.mode = mode; this.set(f, q); }
+  set(f, q) {
+    const g = Math.tan(Math.PI * Math.min(f, sampleRate * 0.45) / sampleRate);
+    this.k = 1 / q; this.a1 = 1 / (1 + g * (g + this.k)); this.a2 = g * this.a1; this.a3 = g * this.a2;
+  }
+  run(v0) {
+    const v3 = v0 - this.ic2;
+    const v1 = this.a1 * this.ic1 + this.a2 * v3;
+    const v2 = this.ic2 + this.a2 * this.ic1 + this.a3 * v3;
+    this.ic1 = 2 * v1 - this.ic1; this.ic2 = 2 * v2 - this.ic2;
+    return this.mode === 'lp' ? v2 : this.mode === 'bp' ? v1 : v0 - this.k * v1 - v2;
+  }
+}
+let seed = 22222;
+const rnd = () => { seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5; return ((seed >>> 0) / 4294967296) * 2 - 1; };
+
+// drums: pitched ones are a sine with a falling pitch, the rest filtered noise
+const PITCHED = { Kick: [130, 0.32, 0.35, 0.95], 'Tom low': [95, 0.6, 0.45, 0.6], 'Tom mid': [140, 0.6, 0.45, 0.6], 'Tom high': [200, 0.6, 0.4, 0.6],
+  'Conga low': [210, 0.85, 0.3, 0.5], 'Conga high': [320, 0.85, 0.25, 0.5], Bongo: [420, 0.8, 0.18, 0.45], Woodblock: [900, 0.95, 0.08, 0.5], Clave: [2500, 1, 0.06, 0.4] };
+const NOISY = { Snare: ['bp', 1800, 0.8, 0.55, 0.22], Clap: ['bp', 1200, 1.5, 0.6, 0.16], Hat: ['hp', 7500, 0.7, 0.3, 0.05], 'Open hat': ['hp', 6500, 0.7, 0.3, 0.38],
+  Ride: ['bp', 5200, 3, 0.25, 0.9], Rim: ['bp', 1700, 4, 0.6, 0.04], Shaker: ['hp', 5000, 0.7, 0.25, 0.09], Tambourine: ['bp', 8000, 2, 0.35, 0.22], Crash: ['hp', 3500, 0.5, 0.35, 1.6] };
+
+function makeVoice(m) {
+  const v = { when: m.when, g: Float32Array.from(m.g), vol: m.vol, line: m.line, bank: m.bank, rel: Infinity, done: false, p1: 0, p2: 0, p3: 0, p4: 0, p5: 0 };
+  if (m.bank === 0) { v.f = m.f; v.len = m.len; v.end = m.len + 0.06; }
+  else if (m.bank === 1) {
+    v.kind = m.kind;
+    if (PITCHED[m.kind]) { [v.f0, v.drop, v.dur, v.pk] = PITCHED[m.kind]; v.end = v.dur + 0.02; v.type = 'pitched'; }
+    else if (m.kind === 'Cowbell') { v.type = 'cowbell'; v.svf = new SVF(800, 2, 'bp'); v.end = 0.4; }
+    else { const n = NOISY[m.kind] || NOISY.Hat; v.type = 'noise'; v.svf = new SVF(n[1], n[2], n[0]); v.pk = n[3]; v.dur = n[4]; v.end = v.dur + 0.05; v.att = m.kind === 'Shaker' ? 0.03 : 0.002; }
+  } else {
+    v.f = m.f; v.dur = Math.max(1.8, m.len * 4); v.end = v.dur + 0.02;
+    v.lp = new SVF(3200, 0.9, 'lp'); v.hp = 0; v.hpx = 0;
+  }
+  return v;
+}
+
+// one block of a note voice into buf[i0 … n): everything that changes slowly (FM depth, pitch drops,
+// vibrato, envelopes) is worked out once per block (128 samples = 2.7 ms) and glided across it;
+// only phases and filters run per sample. That is most of the speed.
+const lerpEnv = (a, b, i, n) => a + (b - a) * (i / n);
+function blockNote(v, tb, i0, n, dt, buf) {
+  const te = tb + n * dt;
+  if (v.bank === 0) {                                     // keyboard: 2-operator FM electric piano + a tine
+    const f = v.f, idx0 = f * (0.25 + 1.95 * Math.exp(-Math.max(0, tb) / 0.12)), idx1 = f * (0.25 + 1.95 * Math.exp(-te / 0.12));
+    const amp = (t) => (t < 0 ? 0 : t < 0.004 ? t / 0.004 : t < v.len * 0.7 ? 1 : Math.max(0, 1 - (t - v.len * 0.7) / (v.len * 0.3)));
+    const a0 = amp(tb + i0 * dt) * 0.42 * v.vol, a1 = amp(te) * 0.42 * v.vol;
+    const tn0 = 0.06 * Math.exp(-Math.max(0, tb) / 0.06) * v.vol, tn1 = 0.06 * Math.exp(-te / 0.06) * v.vol;
+    const dm = f * dt, dtn = f * 4.02 * dt;
+    for (let i = i0; i < n; i++) {
+      v.p2 += dm; if (v.p2 > 1) v.p2 -= 1;
+      const mod = sinT(v.p2) * lerpEnv(idx0, idx1, i, n);
+      v.p1 += (f + mod) * dt; v.p1 -= Math.floor(v.p1); if (v.p1 >= 1) v.p1 = 0;
+      v.p3 += dtn; if (v.p3 > 1) v.p3 -= 1;
+      buf[i] = sinT(v.p1) * lerpEnv(a0, a1, i - i0, n - i0) + sinT(v.p3) * lerpEnv(tn0, tn1, i, n);
+    }
+    return;
+  }
+  if (v.bank === 1) {
+    const ex = (t, d) => Math.exp(-Math.max(0, t) * 6.9 / d);
+    if (v.type === 'pitched') {
+      const fr = (t) => v.f0 * Math.pow(v.drop, Math.min(Math.max(0, t) / (v.dur * 0.5), 1));
+      const f0 = fr(tb), f1 = fr(te), e0 = ex(tb, v.dur) * v.pk * v.vol, e1 = ex(te, v.dur) * v.pk * v.vol;
+      for (let i = i0; i < n; i++) {
+        v.p1 += lerpEnv(f0, f1, i, n) * dt; if (v.p1 > 1) v.p1 -= 1;
+        const t = tb + i * dt;
+        buf[i] = sinT(v.p1) * lerpEnv(e0, e1, i, n) * (t < 0.002 ? t / 0.002 : 1);
+      }
+      return;
+    }
+    if (v.type === 'cowbell') {
+      const e0 = ex(tb, 0.35) * 0.3 * v.vol, e1 = ex(te, 0.35) * 0.3 * v.vol;
+      for (let i = i0; i < n; i++) {
+        v.p1 += 540 * dt; v.p2 += 800 * dt; v.p1 -= Math.floor(v.p1); v.p2 -= Math.floor(v.p2);
+        buf[i] = v.svf.run(((v.p1 < 0.5 ? 1 : -1) + (v.p2 < 0.5 ? 1 : -1)) * 0.5) * lerpEnv(e0, e1, i, n);
+      }
+      return;
+    }
+    const env = (t) => { if (t < 0) return 0; let a = (t < v.att ? t / v.att : 1) * ex(t, v.dur); if (v.kind === 'Clap') for (const d of [0.012, 0.024]) if (t > d) a += 0.6 * ex(t - d, 0.05); return a * v.pk * v.vol; };
+    const e0 = env(tb + i0 * dt), e1 = env(te);
+    const snare = v.kind === 'Snare', s0 = snare ? 0.35 * ex(tb, 0.12) * v.vol : 0, s1 = snare ? 0.35 * ex(te, 0.12) * v.vol : 0;
+    for (let i = i0; i < n; i++) {
+      let x = v.svf.run(rnd()) * lerpEnv(e0, e1, i - i0, n - i0);
+      if (snare) { v.p1 += 185 * dt; if (v.p1 > 1) v.p1 -= 1; x += sinT(v.p1) * lerpEnv(s0, s1, i, n); }
+      buf[i] = x;
+    }
+    return;
+  }
+  // guitar: four detuned saws (root, fifth, octave), slow vibrato, into a tanh "amp" and a cabinet filter
+  const tm = Math.max(0, tb + n * dt * 0.5);
+  const vib = Math.min(1, tm / 0.9) * 14 * Math.sin(TAU * 5.2 * tm);
+  const c = (cents) => Math.pow(2, (cents + vib) / 1200);
+  const d1 = v.f * c(0) * dt, d2 = v.f * c(7) * dt, d3 = v.f * 1.5 * c(-5) * dt, d4 = v.f * 2 * c(3) * dt;
+  const d = v.dur;
+  const envAt = (t) => (t < 0 ? 0 : t < 0.012 ? 0.9 * t / 0.012 : t < 0.5 ? 0.9 - 0.35 * (t - 0.012) / 0.488 : t < d - 0.4 ? 0.55 - 0.15 * (t - 0.5) / Math.max(0.01, d - 0.9) : Math.max(0, 0.4 * (d - t) / 0.4));
+  const g0 = envAt(tb + i0 * dt) * 8.4, g1 = envAt(te) * 8.4, out = 0.16 * v.vol;
+  for (let i = i0; i < n; i++) {
+    v.p1 += d1; v.p2 += d2; v.p3 += d3; v.p4 += d4;
+    if (v.p1 > 1) v.p1 -= 1; if (v.p2 > 1) v.p2 -= 1; if (v.p3 > 1) v.p3 -= 1; if (v.p4 > 1) v.p4 -= 1;
+    const saw = (v.p1 + v.p2 + v.p3) * 0.8 - 1.2 + v.p4 * 0.5 - 0.25;
+    const x = ftanh(saw * lerpEnv(g0, g1, i - i0, n - i0));
+    v.hp = 0.995 * (v.hp + x - v.hpx); v.hpx = x;              // high-pass ~40 Hz
+    buf[i] = v.lp.run(v.hp) * out;
+  }
+}
+
+class Ex12Synth extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.voices = [];
+    this.hums = new Map();
+    this.env = 0; this.gain = 1; this.minGain = 1; this.peak = 0;
+    this.lfeLp = 0;
+    this.started = 0; this.lastStats = 0;
+    this.mix = null;                                       // six channels, L R C LFE Ls Rs, made once
+    this.port.onmessage = (e) => this.onMessage(e.data);
+  }
+  onMessage(m) {
+    if (m.type === 'reset') { this.voices = []; for (const h of this.hums.values()) h.target = 0; return; }
+    if (m.type === 'notes') {
+      for (const n of m.list) {
+        if (n.bank === 2) for (const v of this.voices) if (v.bank === 2 && v.line === n.line && v.rel > n.when) v.rel = n.when;   // one note per string
+        this.voices.push(makeVoice(n));
+        this.started++;
+      }
+      if (this.voices.length > MAX_VOICES) this.voices.splice(0, this.voices.length - MAX_VOICES);
+      return;
+    }
+    if (m.type === 'hums') {
+      const seen = new Set();
+      for (const h of m.list) {
+        seen.add(h.id);
+        let x = this.hums.get(h.id);
+        if (!x) { x = { gain: 0, g: Float32Array.from(h.g), p1: 0, p2: 0, svf: new SVF(h.f * 6, 6, 'bp'), lp: 0 }; this.hums.set(h.id, x); }
+        x.bank = h.bank; x.f = h.f; x.target = h.gain; x.gt = h.g;
+        x.svf.set(h.bank === 1 ? h.f * 20 : h.f * 6, h.bank === 1 ? 2 : 6);
+      }
+      for (const [id, x] of this.hums) if (!seen.has(id)) x.target = 0;
+    }
+  }
+  process(inputs, outputs) {
+    const dev = outputs[0];
+    const n = dev[0].length, och = dev.length;
+    if (!this.mix || this.mix[0].length !== n) this.mix = Array.from({ length: 6 }, () => new Float32Array(n));
+    const out = this.mix, ch = 6;
+    const dt = 1 / sampleRate;
+    const t0 = currentTime;
+    for (let c = 0; c < ch; c++) out[c].fill(0);
+    // notes, a block at a time
+    const buf = this.buf || (this.buf = new Float32Array(n));
+    for (let vi = 0; vi < this.voices.length; vi++) {
+      const v = this.voices[vi];
+      const tb = t0 - v.when;
+      if (tb + n * dt < 0) continue;                         // not yet
+      if (tb > v.end || t0 > v.rel + 0.03) { v.done = true; continue; }
+      const i0 = tb < 0 ? Math.min(n, Math.ceil(-tb / dt)) : 0;
+      blockNote(v, tb, i0, n, dt, buf);
+      let r0 = 1, r1 = 1;                                    // a quick fade when a string is played again
+      if (t0 + n * dt > v.rel) { r0 = Math.max(0, 1 - (t0 - v.rel) / 0.03); r1 = Math.max(0, 1 - (t0 + n * dt - v.rel) / 0.03); }
+      const g0 = v.g[0], g1 = v.g[1], g2 = v.g[2], g3 = v.g[3], g4 = v.g[4], g5 = v.g[5];
+      const o0 = out[0], o1 = out[1], o2 = out[2], o3 = out[3], o4 = out[4], o5 = out[5];
+      for (let i = i0; i < n; i++) {
+        const x = buf[i] * (r0 + (r1 - r0) * i / n);
+        o0[i] += x * g0; o1[i] += x * g1; o2[i] += x * g2; o3[i] += x * g3; o4[i] += x * g4; o5[i] += x * g5;
+      }
+      if (tb + n * dt > v.end) v.done = true;
+    }
+    if (this.voices.some((v) => v.done)) this.voices = this.voices.filter((v) => !v.done);
+    // hums: two sines (or a saw for the guitar) + a breath of noise; gain and panning glide
+    const a = 1 - Math.exp(-dt / 0.08);
+    for (const [id, h] of this.hums) {
+      for (let i = 0; i < n; i++) {
+        h.gain += (h.target - h.gain) * a;
+        if ((i & 15) === 0) for (let c = 0; c < 6; c++) h.g[c] += (h.gt[c] - h.g[c]) * a * 16;
+        const f = h.f;
+        h.p1 += f * dt; h.p2 += f * 1.004 * dt; h.p1 -= Math.floor(h.p1); h.p2 -= Math.floor(h.p2);
+        let tone = h.bank === 2 ? ((h.p1 * 2 - 1) + (h.p2 * 2 - 1)) * 0.35 : h.bank === 1 ? 0 : sinT(h.p1) + sinT(h.p2);
+        h.lp += (tone - h.lp) * (h.bank === 2 ? 0.054 : 0.083);   // ~420 / ~650 Hz
+        const s = (h.lp + h.svf.run(rnd()) * (h.bank === 1 ? 0.5 : 0.22)) * h.gain;
+        for (let c = 0; c < ch; c++) out[c][i] += s * h.g[c];
+      }
+      if (h.target === 0 && h.gain < 1e-4) this.hums.delete(id);
+    }
+    // the LFE only gets the lows
+    for (let i = 0; i < n; i++) { this.lfeLp += (out[3][i] - this.lfeLp) * 0.0143; out[3][i] = this.lfeLp; }
+    // to the device: six channels as they are, or folded down to stereo (C and the surrounds at
+    // -3 dB into each side, the LFE at -6 dB into both)
+    if (och >= 6) for (let c = 0; c < 6; c++) dev[c].set(out[c]);
+    else {
+      const L = dev[0], R = och > 1 ? dev[1] : null;
+      for (let i = 0; i < n; i++) {
+        const mid = 0.7071 * out[2][i] + 0.5 * out[3][i];
+        L[i] = out[0][i] + mid + 0.7071 * out[4][i];
+        if (R) R[i] = out[1][i] + mid + 0.7071 * out[5][i];
+      }
+      for (let c = 2; c < och; c++) dev[c].fill(0);
+    }
+    // then one limiter for all the device's channels (linked, so the image holds)
+    const rel = Math.exp(-dt / 0.15), att = 1 - Math.exp(-dt / 0.001), thr = 0.5;
+    for (let i = 0; i < n; i++) {
+      let pk = 0;
+      for (let c = 0; c < och; c++) { const x = Math.abs(dev[c][i]); if (x > pk) pk = x; }
+      this.env = pk > this.env ? pk : this.env * rel;
+      const want = this.env > thr ? thr / this.env : 1;
+      this.gain += (want - this.gain) * (want < this.gain ? att * 8 : att * 0.05);
+      if (this.gain < this.minGain) this.minGain = this.gain;
+      for (let c = 0; c < och; c++) { let x = dev[c][i] * this.gain * 1.3; if (x > 0.95 || x < -0.95) x = Math.tanh(x); dev[c][i] = x; if (Math.abs(x) > this.peak) this.peak = Math.abs(x); }
+    }
+    if (t0 - this.lastStats > 0.25) {
+      const span = t0 - this.lastStats;
+      this.port.postMessage({ voices: this.voices.length, hums: this.hums.size, peak: +this.peak.toFixed(3), reduction: +(20 * Math.log10(Math.max(1e-4, this.minGain))).toFixed(1), notesPerSec: Math.round(this.started / span) });
+      this.lastStats = t0; this.peak = 0; this.minGain = 1; this.started = 0;
+    }
+    return true;
+  }
+}
+registerProcessor('ex12-synth', Ex12Synth);
+</script>
+
+<script>
+'use strict';
+// =====================================================================================
+// 1 · THE DOME: venue geometry (Wisdome Malmö)
+// Frames: ROOM x = right, y = forward (front of the room), z = up; az = degrees from the front,
+// + to the right; el = degrees above eye level. LOCAL = the dome's own frame (z = the dome's axis,
+// the centre of the master), tilted 26° forward. MASTER = the square fisheye, front at the bottom.
+// =====================================================================================
+const D = Math.PI / 180;
+const FOV = 160;            // the player spreads the whole circle of the master over 160°
+const TILT = 26;            // raised at the back: the master's centre is 64° up, in front
+const DOME = {
+  opening: 160, venueFov: FOV,
+  // the venue counts angles in the image: 0 at the rim, 90 at the centre. Their sweet spot is "40":
+  sweetSpot: (90 - TILT) - (1 - 40 / 90) * FOV / 2,      // ≈ 19.6° above eye level, straight ahead
+};
+const dirRoom = (az, el) => { const ca = Math.cos(el * D); return [ca * Math.sin(az * D), ca * Math.cos(az * D), Math.sin(el * D)]; };
+const azElOf = ([x, y, z]) => [Math.atan2(x, y) / D, Math.asin(Math.max(-1, Math.min(1, z))) / D];
+const roomToLocal = ([x, y, z]) => { const c = Math.cos(TILT * D), s = Math.sin(TILT * D); return [x, y * c - z * s, y * s + z * c]; };
+const localToRoom = ([a, b, cz]) => { const c = Math.cos(TILT * D), s = Math.sin(TILT * D); return [a, b * c + cz * s, -b * s + cz * c]; };
+/** a point on the master (x, y in 0..1, y DOWN, as a pointer gives it) -> room { az, el }, or null outside the circle */
+function masterXYToRoom(x, y) {
+  const u = x * 2 - 1, v = 1 - y * 2, r = Math.hypot(u, v);
+  if (r > 1) return null;
+  const th = r * (FOV / 2) * D, n = r || 1;
+  const [az, el] = azElOf(localToRoom([Math.sin(th) * u / n, -Math.sin(th) * v / n, Math.cos(th)]));
+  return { az, el };
+}
+// 5.1: L R C LFE Ls Rs. Pan between the two nearest speakers of the ring (constant power);
+// going up, the sound spreads over all five, so at the zenith it comes from everywhere.
+const SPEAKERS = [{ ch: 4, az: -110 }, { ch: 0, az: -30 }, { ch: 2, az: 0 }, { ch: 1, az: 30 }, { ch: 5, az: 110 }];
+function gains51(az, el = 0) {
+  const g = new Float32Array(6);
+  let a = ((az + 180) % 360 + 360) % 360 - 180;
+  if (a < SPEAKERS[0].az) a += 360;
+  for (let i = 0; i < SPEAKERS.length; i++) {
+    const s1 = SPEAKERS[i], s2 = SPEAKERS[(i + 1) % SPEAKERS.length];
+    const a1 = s1.az, a2 = i === SPEAKERS.length - 1 ? s2.az + 360 : s2.az;
+    if (a >= a1 && a <= a2) { const t = (a - a1) / (a2 - a1); g[s1.ch] = Math.cos(t * Math.PI / 2); g[s2.ch] = Math.sin(t * Math.PI / 2); break; }
+  }
+  const w = Math.pow(Math.max(0, Math.min(1, el / 90)), 1.3);
+  for (const s of SPEAKERS) g[s.ch] = Math.sqrt((1 - w) * g[s.ch] * g[s.ch] + w / 5);
+  return g;
+}
+
+// =====================================================================================
+// 2 · THE INSTRUMENT: constants, notes, colours
+// =====================================================================================
+const RAMP = 3;          // seconds the first reader takes to change speed when the first line appears
+const PHI0 = 180;        // where the first reader starts: behind the audience
+const BAND_DEG = 10;     // one note per 10° of height
+const MER_DEG = 15;      // the mesh's meridians; lines snap to them
+const NS = 3;            // spheres
+const MAX_L = 256;       // lines per sphere (picture)
+const MAX_R = 64;        // readers per sphere (picture)
+const TEX_W = 256;       // the data texture the picture reads lines and readers from
+const HUM_MAX = 48;      // hums sounding at once (the loudest): cheap in the synth
+const FADE_IN = 1.5, FADE_CLICK = 0.25, FADE_OUT = 0.4;
+const FLY = 5;           // seconds a flight takes
+const RORB = 2.3;        // sphere radius = 1; distance of each sphere from the common centre
+const INCL = 35;         // the orbit plane leans this much towards us
+const BETA = 15;         // from outside we look down on the spheres a little, to see their bands
+const PAN_EL = 0.5;      // 5.1 has no height: pan with half the elevation so things keep circling
+const LATE = 0.35;       // a hit this late (a click) still plays, at once
+const MUTE = '#a9adb6';
+
+const SPHERES = [{ name: 'Keyboard', col: '#9fdcff' }, { name: 'Drums', col: '#ffb547' }, { name: 'Guitar', col: '#ff6b8a' }];
+const NOTE_COL = ['#ff7a3d', '#ffb547', '#5be38b', '#6cc6ff', '#b58cff'];
+const SCALES = {
+  major: { root: 261.63, steps: [0, 2, 4, 7, 9], names: ['C', 'D', 'E', 'G', 'A'], oct: 4, fromC: 0 },
+  minor: { root: 220.0, steps: [0, 3, 5, 7, 10], names: ['A', 'C', 'D', 'E', 'G'], oct: 3, fromC: 9 },
+  guitar: { root: 82.41, steps: [0, 3, 5, 7, 10], names: ['E', 'G', 'A', 'B', 'D'], oct: 2, fromC: 4 },   // E minor pentatonic from E2
+};
+const DRUMS = ['Kick', 'Tom low', 'Tom mid', 'Tom high', 'Snare', 'Clap', 'Hat', 'Open hat', 'Ride'];
+// the southern hemisphere of the drums (band -1 just below the rim, down to -10 at the south pole)
+const DRUMS_LOW = ['Rim', 'Cowbell', 'Shaker', 'Conga high', 'Conga low', 'Clave', 'Tambourine', 'Woodblock', 'Bongo', 'Crash'];
+const drumOf = (band) => (band >= 0 ? DRUMS[band] : DRUMS_LOW[-band - 1]) || 'Hat';
+const DRUM_COL = ['#ff7a3d', '#ffb547', '#ffd27a', '#fff0b0', '#f2efe9', '#ffd0e0', '#9fdcff', '#6cc6ff', '#b58cff'];
+const DRUM_COL_LOW = ['#ffe08a', '#e8c070', '#c0e0ff', '#ff9a6a', '#d06a40', '#fff6d0', '#c8f0ff', '#e0b080', '#ffb090', '#ffffff'];
+const lineColor = (k, band) => (k === 1 ? (band >= 0 ? DRUM_COL[band] : DRUM_COL_LOW[-band - 1]) || '#ffffff' : NOTE_COL[((band % 5) + 5) % 5]);
+const hexRGB = (h) => [parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255];
+
+function noteOf(band, scale) {
+  const sc = SCALES[scale] || SCALES.major;
+  const o = Math.floor(band / 5), d = ((band % 5) + 5) % 5, semi = 12 * o + sc.steps[d];   // bands below the rim go down the scale
+  return { freq: sc.root * Math.pow(2, semi / 12), name: sc.names[d] + (sc.oct + Math.floor((sc.fromC + semi) / 12)), degree: d };
+}
+const scaleOf = (k, view) => (k === 2 ? 'guitar' : view.p('scale'));
+const labelOf = (k, band, view) => (k === 1 ? drumOf(band) : noteOf(band, scaleOf(k, view)).name);
+
+// =====================================================================================
+// 3 · THE STATE: settings, and everything that happened, with its time on ONE clock
+// =====================================================================================
+const PARAMS = {
+  extra: { type: 'range', label: 'Generated lines per sphere', min: 0, max: 240, step: 10, value: 0, group: 'stress' },
+  extraR: { type: 'range', label: 'Readers per height', min: 1, max: 4, step: 1, value: 1, group: 'stress' },
+  hud: { type: 'toggle', label: 'HUD on the dome (I)', value: true, group: 'stress' },
+  auto: { type: 'toggle', label: 'Play the score by itself', value: true },
+  intro: { type: 'range', label: 'First line after', min: 3, max: 60, step: 1, value: 20, unit: 's' },
+  more: { type: 'range', label: 'Two more after', min: 2, max: 30, step: 1, value: 10, unit: 's' },
+  introOrbit: { type: 'range', label: 'One orbit, at first', min: 1, max: 12, step: 0.5, value: 4, unit: 's' },
+  orbit: { type: 'range', label: 'One orbit, with notes', min: 0.5, max: 8, step: 0.1, value: 2, unit: 's' },
+  band: { type: 'range', label: 'Score band (×10° above the rim)', min: 0, max: 8, step: 1, value: 2 },
+  scale: { type: 'select', label: 'Keyboard scale', options: [['major', 'C major pentatonic'], ['minor', 'A minor pentatonic']], value: 'major' },
+  note: { type: 'range', label: 'Note length', min: 0.1, max: 1.5, step: 0.05, value: 0.5, unit: 's' },
+  dir: { type: 'select', label: 'Direction', options: [['cw', 'Clockwise (to the right)'], ['ccw', 'Anticlockwise']], value: 'cw' },
+  frame: { type: 'select', label: 'Sphere', options: [['dome', 'With the dome (tilted)'], ['room', 'Upright (equator = eye level)']], value: 'dome' },
+  outDist: { type: 'range', label: 'Fly out to (× radius)', min: 3.5, max: 14, step: 0.5, value: 5.5 },
+  orbT: { type: 'range', label: 'Spheres: one orbit', min: 30, max: 600, step: 10, value: 120, unit: 's' },
+  mesh: { type: 'range', label: 'Mesh', min: 0, max: 1, step: 0.01, value: 0.45 },
+  hum: { type: 'range', label: 'Hum', min: 0, max: 1, step: 0.01, value: 0.5 },
+  vol: { type: 'range', label: 'Notes', min: 0, max: 1, step: 0.01, value: 0.7 },
+  names: { type: 'toggle', label: 'Note names on the bands (inside)', value: false },
+};
+const P = Object.fromEntries(Object.entries(PARAMS).map(([k, d]) => [k, d.value]));
+
+// The clock. Before the sound starts it is the page's own clock; once it starts it is the AUDIO
+// clock (the moment being heard now), shifted so that it carries on without a jump. Picture and
+// sound both read it, so a line flashes exactly when its note is heard.
+let ac = null, audioOn = false, clockOffset = 0, lastClock = 0;
+function audioNow() {
+  const ts = ac.getOutputTimestamp ? ac.getOutputTimestamp() : null;
+  if (ts && ts.performanceTime > 0 && ts.contextTime > 0) return ts.contextTime + (performance.now() - ts.performanceTime) / 1000;
+  return ac.currentTime;
+}
+function clock() {
+  let t = audioOn ? audioNow() + clockOffset : performance.now() / 1000;
+  if (t < lastClock) t = lastClock;            // never run backwards
+  return (lastClock = t);
+}
+const ctxTime = (t) => t - clockOffset;        // a time on our clock -> the AudioContext's time
+
+// what happened, and when (all times on clock()). R starts a fresh one.
+const fresh = (start) => ({ start, presses: {}, events: {}, globals: {} });
+let S = fresh(clock());
+const lastSet = {};
+const press = (k) => (S.presses[k] ||= []).push(clock());
+const bus = {
+  cmd(c) {
+    if (c.type === 'set') (S.events[c.key] ||= []).push({ at: clock(), value: c.value });
+    else if (c.type === 'global') S.globals[c.key] = c.value;
+  },
+};
+function setParam(k, v) { P[k] = v; lastSet[k] = clock(); syncControl(k); }
+function restart() { S = fresh(clock()); }
+// the slide's view of the state (the same names as in the live slides, so the code below reads the same)
+const view = {
+  now: () => clock(),
+  p: (k) => P[k],
+  presses: (k) => S.presses[k] || [],
+  events: (k) => S.events[k] || [],
+  lastSet: (k) => (k in lastSet ? lastSet[k] : -Infinity),
+  global: (k) => S.globals[k],
+};
+
+// =====================================================================================
+// 4 · THE WORLD at time t: where the spheres, the camera, every line and reader are.
+// Picture and sound both call score(); nothing is "detected", every hit is solved for.
+// =====================================================================================
+// WORLD = the dome's own frame (with the dome) or the room (upright). Sphere radius 1.
+function rimEl(frame) { return frame === 'room' ? 0 : 90 - Math.min(DOME.opening, DOME.venueFov) / 2; }   // band 0 starts here
+function nBands(frame) { return Math.floor((90 - rimEl(frame)) / BAND_DEG); }        // bands above the rim: 0 … nBands-1
+function bMin(frame) { return -Math.floor((90 + rimEl(frame)) / BAND_DEG); }          // …and below it, down to the south pole
+const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const mul = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const len = (a) => Math.hypot(a[0], a[1], a[2]);
+const norm = (a) => mul(a, 1 / (len(a) || 1));
+const lerp = (a, b, u) => add(a, mul(sub(b, a), u));
+const ease = (u) => u * u * (3 - 2 * u);
+const wrap = (a) => ((a + 180) % 360 + 360) % 360 - 180;
+const mod = (a, n) => ((a % n) + n) % n;
+const same = (a, b) => Math.abs(wrap(a - b)) < 1;
+const roomToWorld = (frame, v) => (frame === 'room' ? v : roomToLocal(v));
+const worldToRoomAzEl = (frame, v) => { const [az, el] = azElOf(norm(frame === 'room' ? v : localToRoom(v))); return { az, el }; };
+// sphere -> world rotation: pitch about x, after yaw about the sphere's pole (z). Rows.
+function rotM(yaw, pitch) {
+  const cy = Math.cos(yaw * D), sy = Math.sin(yaw * D), cp = Math.cos(pitch * D), sp = Math.sin(pitch * D);
+  return [[cy, -sy, 0], [cp * sy, cp * cy, -sp], [sp * sy, sp * cy, cp]];
+}
+const rx = (a, v) => { const c = Math.cos(a * D), s = Math.sin(a * D); return [v[0], v[1] * c - v[2] * s, v[1] * s + v[2] * c]; };   // pitch
+const mv = (M, v) => [dot(M[0], v), dot(M[1], v), dot(M[2], v)];
+const mtv = (M, v) => [M[0][0] * v[0] + M[1][0] * v[1] + M[2][0] * v[2], M[0][1] * v[0] + M[1][1] * v[1] + M[2][1] * v[2], M[0][2] * v[0] + M[1][2] * v[1] + M[2][2] * v[2]];
+
+/** Everything about the world at clock time t, from the state only. */
+function score(view, t) {
+  const start = S.start;
+  const s = t - start;
+  const auto = view.p('auto'), more = view.p('more');
+  let s1 = auto ? view.p('intro') : Infinity, s2 = null;
+  for (const abs of view.presses('step')) {
+    const p = abs - start;
+    if (p < s1) s1 = Math.max(0, p);
+    else if (s2 === null && p < (auto ? s1 + more : Infinity)) s2 = p;
+  }
+  if (s2 === null) s2 = auto ? s1 + more : Infinity;
+
+  // the first reader: v0 until the first line, then a smooth ramp to v1 (deg/s)
+  const v0 = 360 / view.p('introOrbit'), v1 = 360 / view.p('orbit');
+  const P1 = v0 * s1, P2 = P1 + (v0 + v1) / 2 * RAMP;
+  const Phi0 = (x) => {
+    if (x <= s1) return v0 * Math.max(0, x);
+    if (x <= s1 + RAMP) { const u = x - s1; return P1 + v0 * u + (v1 - v0) * u * u / (2 * RAMP); }
+    return P2 + v1 * (x - s1 - RAMP);
+  };
+  const Phi0Inv = (P) => {
+    if (P <= P1) return P / v0;
+    if (P <= P2) {
+      const a = (v1 - v0) / (2 * RAMP), c = P1 - P;
+      return s1 + (Math.abs(a) < 1e-9 ? (P - P1) / v0 : (-v0 + Math.sqrt(v0 * v0 - 4 * a * c)) / (2 * a));
+    }
+    return s1 + RAMP + (P - P2) / v1;
+  };
+  const speed0 = (x) => (x <= s1 ? v0 : x <= s1 + RAMP ? v0 + (v1 - v0) * (x - s1) / RAMP : v1);
+  const linear = (st) => ({ Phi: (x) => v1 * Math.max(0, x - st), PhiInv: (P) => st + P / v1, speed: () => v1 });
+
+  const frame = view.p('frame');
+  const band0 = Math.max(0, Math.min(nBands(frame) - 1, Math.round(view.p('band'))));
+  const dir = view.p('dir') === 'ccw' ? -1 : 1;
+
+  // ---- where things are. Inside a sphere we look out in the dome's frame (the sphere's pole is the
+  // dome's axis). Out in the void the camera also PITCHES, so that what is ahead of the audience (the
+  // sweet spot) looks at the spheres from the side and a little above, and their bands face us.
+  const Fv = norm(roomToWorld(frame, dirRoom(0, DOME.sweetSpot)));         // straight ahead, in the view
+  const ALPHA = -(Math.asin(Fv[2]) / D + BETA);                            // the camera's pitch, out in the void
+  const Fw = [0, Math.cos(BETA * D), -Math.sin(BETA * D)];                 // …where it then looks, in the world
+  const E1 = [1, 0, 0];
+  const U = [0, Math.sin(BETA * D), Math.cos(BETA * D)];                   // "up", across Fw
+  const E2 = norm(add(mul(U, Math.cos(INCL * D)), mul(Fw, Math.sin(INCL * D))));
+  const orbT = view.p('orbT');
+  const centre = (k, x) => { const th = 2 * Math.PI * (x / orbT + k / NS) + Math.PI / 2; return add(mul(E1, RORB * Math.cos(th)), mul(E2, RORB * Math.sin(th))); };
+  const OUT = mul(Fw, -view.p('outDist'));
+  // rotations (shift + drag): a live value, reset with the piece
+  const g = view.global('ex11rot');
+  const rots = g && Math.abs(g.start - start * 1000) < 1 && Array.isArray(g.r) ? g.r : [];
+  const M = Array.from({ length: NS }, (_, k) => rotM(rots[k]?.[0] || 0, rots[k]?.[1] || 0));
+
+  // ---- the camera's flights: 'out', or k = the centre of sphere k
+  const flights = [
+    ...view.presses('flyout').map((a) => ({ x: a - start, to: 'out' })),
+    ...[0, 1, 2].flatMap((k) => view.presses(`in${k}`).map((a) => ({ x: a - start, to: k }))),
+    ...view.events('fly').map((e) => ({ x: e.at - start, to: e.value?.to })),
+  ].filter((f) => f.to === 'out' || [0, 1, 2].includes(f.to)).sort((a, b) => a.x - b.x);
+  const targetAt = (to, x) => (to === 'out' ? { p: OUT, a: ALPHA } : { p: centre(to, x), a: 0 });
+  /** the camera at time x: position p (world) and pitch a (deg) */
+  const camState = (x) => {
+    let i = -1; while (i + 1 < flights.length && flights[i + 1].x <= x) i++;
+    const rec = (j) => {
+      if (j < 0) return { p: centre(0, x), a: 0 };
+      const tg = targetAt(flights[j].to, x), u = (x - flights[j].x) / FLY;
+      if (u >= 1) return tg;
+      const pr = rec(j - 1), e = ease(u);
+      return { p: lerp(pr.p, tg.p, e), a: pr.a + (tg.a - pr.a) * e };
+    };
+    return rec(i);
+  };
+  const camAt = (x) => camState(x).p;
+  const viewToWorld = (x, v) => rx(camState(x).a, v);
+  const worldToView = (x, v) => rx(-camState(x).a, v);
+  const insideAt = (x) => { const c = camAt(x); for (let k = 0; k < NS; k++) if (len(sub(c, centre(k, x))) < 0.98) return k; return -1; };
+  const restingIn = (x) => { const k = insideAt(x); return k >= 0 && len(sub(camAt(x), centre(k, x))) < 0.02 ? k : -1; };
+
+  // ---- the instruments: lines + readers per sphere, from the score and the edits
+  const spheres = Array.from({ length: NS }, () => ({ lines: [], readers: [] }));
+  spheres[0].lines.push(
+    { id: 'p0', az: 0, band: band0, appear: s1, gone: Infinity, fade: FADE_IN },
+    { id: 'p1', az: 120, band: band0, appear: s2, gone: Infinity, fade: FADE_IN },
+    { id: 'p2', az: -120, band: band0, appear: s2, gone: Infinity, fade: FADE_IN },
+  );
+  spheres[0].readers.push({ id: 'r0', band: band0, start: 0, end: Infinity, startAz: wrap(dir * PHI0), Phi: Phi0, PhiInv: Phi0Inv, speed: speed0 });
+  const evs = [
+    ...view.events('edit').map((e) => ({ x: e.at - start, e: e.value })),
+    ...view.presses('clear').map((a) => ({ x: a - start, clear: true })),
+  ].sort((a, b) => a.x - b.x);
+  let n = 0;
+  for (const ev of evs) {
+    const x = ev.x;
+    const aliveL = (l) => l.appear <= x && l.gone > x, aliveR = (r) => r.start <= x && r.end > x;
+    if (ev.clear) { for (const sp of spheres) { sp.lines.forEach((l) => { if (l.user && aliveL(l)) l.gone = x; }); sp.readers.forEach((r) => { if (r.user && aliveR(r)) r.end = x; }); } continue; }
+    const e = ev.e; if (!e || !spheres[e.k] || !Number.isFinite(e.band) || e.band < bMin(frame) || e.band >= nBands(frame)) continue;
+    const sp = spheres[e.k];
+    const hit = sp.lines.find((l) => aliveL(l) && l.band === e.band && same(l.az, e.az));
+    if (e.shift) {
+      if (!hit) continue;
+      hit.gone = x;
+      if (!sp.lines.some((l) => aliveL(l) && l.band === e.band)) sp.readers.forEach((r) => { if (aliveR(r) && r.band === e.band) r.end = x; });
+    } else if (hit) {
+      sp.readers.push({ id: `u${n++}`, user: true, band: e.band, start: x, end: Infinity, startAz: hit.az, ...linear(x) });
+    } else {
+      sp.lines.push({ id: `l${n++}`, user: true, az: e.az, band: e.band, appear: x, gone: Infinity, fade: FADE_CLICK });
+      if (!sp.readers.some((r) => aliveR(r) && r.band === e.band))
+        sp.readers.push({ id: `u${n++}`, user: true, band: e.band, start: x, end: Infinity, startAz: e.az, ...linear(x) });
+    }
+  }
+  // STRESS: generated lines (and readers for every height that has lines), always the same ones
+  const extra = Math.round(view.p('extra')), extraR = Math.round(view.p('extraR'));
+  if (extra > 0) {
+    const t0 = Math.max(0, view.lastSet('extra') - start);
+    const lo = bMin(frame), hi = nBands(frame);
+    for (let k = 0; k < NS; k++) {
+      let h = 1234567 * (k + 1);
+      const rnd = () => { h = (h * 1103515245 + 12345) & 0x7fffffff; return h / 0x7fffffff; };
+      const bands = new Set();
+      for (let i = 0; i < extra; i++) {
+        const band = lo + Math.floor(rnd() * (hi - lo)), az = wrap(Math.floor(rnd() * 24) * MER_DEG);
+        spheres[k].lines.push({ id: `x${i}`, user: true, az, band, appear: t0, gone: Infinity, fade: FADE_CLICK });
+        bands.add(band);
+      }
+      for (const band of bands) for (let j = 0; j < extraR; j++)
+        spheres[k].readers.push({ id: `xr${band}_${j}`, user: true, band, start: t0, end: Infinity, startAz: wrap(j * 360 / extraR + band * 17 + k * 41), ...linear(t0) });
+    }
+  }
+  for (const sp of spheres) {
+    for (const r of sp.readers) r.az = (x) => wrap(r.startAz + dir * r.Phi(x));
+    // index by height: a reader only ever plays the lines of its own band
+    sp.linesByBand = new Map(); sp.readersByBand = new Map();
+    for (const l of sp.lines) { if (!sp.linesByBand.has(l.band)) sp.linesByBand.set(l.band, []); sp.linesByBand.get(l.band).push(l); }
+    for (const r of sp.readers) { if (!sp.readersByBand.has(r.band)) sp.readersByBand.set(r.band, []); sp.readersByBand.get(r.band).push(r); }
+  }
+
+  const rim = rimEl(frame);
+  /** a point on sphere k (its own az, height above its rim) -> world position at time x */
+  const worldPoint = (k, az, h, x) => add(centre(k, x), mv(M[k], dirRoom(az, rim + h)));
+  /** what a room direction from the camera hits at time x: { k, cell } (cell may be null) */
+  const pick = (az, el, x) => {
+    const d = norm(viewToWorld(x, roomToWorld(frame, dirRoom(az, el)))), c = camAt(x), inside = insideAt(x);
+    let best = null;
+    for (let k = 0; k < NS; k++) {
+      const oc = sub(c, centre(k, x)), b = dot(oc, d), cc = dot(oc, oc) - 1, disc = b * b - cc;
+      if (disc < 0) continue;
+      const sq = Math.sqrt(disc), t0 = -b - sq, t1 = -b + sq;
+      const tt = k === inside ? t1 : t0 > 0 ? t0 : null;
+      if (tt === null || tt <= 0) continue;
+      if (inside >= 0 && k !== inside) continue;            // inside a sphere, you play that sphere
+      if (!best || tt < best.t) best = { k, t: tt };
+    }
+    if (!best) return null;
+    const u = mtv(M[best.k], norm(sub(add(c, mul(d, best.t)), centre(best.k, x))));
+    const [saz, sel] = azElOf(u);
+    const band = Math.floor((sel - rim) / BAND_DEG);
+    const cell = band >= bMin(frame) && band < nBands(frame) ? { az: wrap(Math.round(saz / MER_DEG) * MER_DEG), band } : null;
+    return { k: best.k, cell, inside: inside === best.k };
+  };
+  return { s, start, frame, dir, rim, band0, spheres, M, centre, camAt, camState, worldToView, insideAt, restingIn, worldPoint, pick, rots };
+}
+
+// reader r is over line l when Phi_r = c + 360 n, c = (dir·(l.az − r.startAz)) mod 360
+const crossC = (sc, r, l) => mod(sc.dir * (l.az - r.startAz), 360);
+const hitWindow = (r, l) => [Math.max(r.start, l.appear), Math.min(r.end, l.gone)];
+function sinceHit(sc, sp, l, s) {
+  let best = Infinity;
+  for (const r of sp.readersByBand.get(l.band) || []) {
+    if (r.band !== l.band) continue;
+    const [a, b] = hitWindow(r, l);
+    if (a > s) continue;
+    const c = crossC(sc, r, l);
+    for (let n = Math.floor((r.Phi(Math.min(s, b)) - c) / 360); n >= 0; n--) {
+      const th = r.PhiInv(c + 360 * n);
+      if (th > s || th >= b) continue;
+      if (th >= a) best = Math.min(best, s - th);
+      break;
+    }
+  }
+  return best;
+}
+function hitsBetween(sc, r, l, from, to) {
+  const out = [];
+  if (r.band !== l.band) return out;
+  const [a, b] = hitWindow(r, l);
+  const lo = Math.max(from, a), hi = Math.min(to, b);
+  if (lo >= hi) return out;
+  const c = crossC(sc, r, l);
+  let n = Math.max(0, Math.ceil((r.Phi(lo) - c) / 360 - 1e-9));
+  for (let i = 0; i < 64; i++, n++) {
+    const th = r.PhiInv(c + 360 * n);
+    if (th >= hi) break;
+    if (th >= lo) out.push({ at: th, n });
+  }
+  return out;
+}
+const fadeOf = (x, a, b, fin) => Math.max(0, Math.min(1, (x - a) / fin, 1 - (x - b) / FADE_OUT));
+const readerFade = (r, s) => fadeOf(s, r.start, r.end, r.id === 'r0' ? 2 : 0.4);
+/** how loud sphere k is from where the camera is: 1 inside, falling off outside */
+const gainOf = (sc, k, s) => { const d = len(sub(sc.camAt(s), sc.centre(k, s))); return d <= 1 ? 1 : Math.pow(1 / d, 1.2); };
+
+// =====================================================================================
+// 5 · THE MOUSE: a click is resolved to a sphere + cell at the moment of the click, and logged
+// =====================================================================================
+let drag = null;
+function onClick(e) {
+  const sc = score(view, view.now());
+  const hit = sc.pick(e.az, e.el, sc.s);
+  if (!hit) return;
+  if (e.dbl && !hit.inside) { bus.cmd({ type: 'set', key: 'fly', value: { to: hit.k } }); return; }
+  if (!hit.cell) return;
+  const edit = { k: hit.k, az: hit.cell.az, band: hit.cell.band, shift: !!e.shift };
+  bus.cmd({ type: 'set', key: 'edit', value: edit });
+  if (e.dbl) bus.cmd({ type: 'set', key: 'edit', value: edit });   // inside, a double click is two clicks
+}
+function onDrag(e) {
+  const sc = score(view, view.now());
+  if (e.phase === 'start') {
+    const k = sc.insideAt(sc.s) >= 0 ? sc.insideAt(sc.s) : sc.pick(e.az, e.el, sc.s)?.k;
+    drag = k === undefined || k === null ? null : { k, base: [...(sc.rots[k] || [0, 0])] };
+    return;
+  }
+  if (!drag) return;
+  const r = Array.from({ length: NS }, (_, k) => [...(sc.rots[k] || [0, 0])]);
+  r[drag.k] = [drag.base[0] - e.dx * 0.35, Math.max(-80, Math.min(80, drag.base[1] + e.dy * 0.35))];
+  bus.cmd({ type: 'global', key: 'ex11rot', value: { start: sc.start * 1000, r } });
+  if (e.phase === 'end') drag = null;
+}
+
+// =====================================================================================
+// 6 · THE PICTURE: one fragment shader ray-traces the three spheres for every pixel of the master
+// =====================================================================================
+const cv = document.getElementById('c');
+const gl = cv.getContext('webgl2', { antialias: false, alpha: false, preserveDrawingBuffer: true, powerPreference: 'high-performance' });
+const msg = document.getElementById('msg');
+const say = (t) => (msg.textContent = t);
+
+const B = BAND_DEG.toFixed(1);
+const FS = `#version 300 es
+precision highp float;
+precision highp int;
+out vec4 frag;
+#define PI 3.14159265359
+#define DEG 0.01745329252
+uniform vec2 uRes;
+uniform float uGuide, uFront;
+const float FOV = ${FOV.toFixed(1)}, TILT = ${TILT.toFixed(1)};
+const float SWEET_EL = ${DOME.sweetSpot.toFixed(4)};                    // ≈ 19.6° up, straight ahead
+const vec3 BAND = vec3(${((90 - TILT) - FOV / 2).toFixed(1)}, ${(DOME.sweetSpot + 25).toFixed(4)}, 60.0);   // zone: el from, el to, ±az
+
+// ---- master <-> room (equidistant fisheye, 160°, tilted 26°, front at the bottom edge)
+vec3 masterToLocal(vec2 m){ float r = length(m), th = r * FOV * 0.5 * DEG; vec2 d = r > 1e-6 ? m / r : vec2(0.0); return vec3(sin(th) * d.x, -sin(th) * d.y, cos(th)); }
+vec3 localToRoom(vec3 l){ float c = cos(TILT * DEG), s = sin(TILT * DEG); return vec3(l.x, l.y * c + l.z * s, -l.y * s + l.z * c); }
+vec3 dirRoom(float azDeg, float elDeg){ float a = azDeg * DEG, e = elDeg * DEG; return vec3(cos(e) * sin(a), cos(e) * cos(a), sin(e)); }
+float azOf(vec3 d){ return atan(d.x, d.y) / DEG; }
+float elOf(vec3 d){ return asin(clamp(d.z, -1.0, 1.0)) / DEG; }
+float angleBetween(vec3 a, vec3 b){ return acos(clamp(dot(a, b), -1.0, 1.0)) / DEG; }
+float aaLine(float dist, float width){ float w = fwidth(dist); return 1.0 - smoothstep(width * 0.5 - w, width * 0.5 + w, abs(dist)); }
+// text drawn in angles (the HUD, note names): an equirect canvas, az -180..180 × el -30..90
+uniform sampler2D uEq;
+vec4 sampleEq(sampler2D tex, vec3 d){
+  float u1 = atan(d.x, d.y) / (2.0 * PI) + 0.5;
+  float u2 = fract(u1 + 0.5) - 0.5;          // Tarini's seam trick: pick the param without the jump
+  float u = fwidth(u1) <= fwidth(u2) + 1e-5 ? u1 : u2;
+  float el = asin(clamp(d.z, -1.0, 1.0));
+  float v = 1.0 - (PI * 0.5 - el) / (PI * 2.0 / 3.0);
+  if (v < 0.0) return vec4(0.0);
+  return texture(tex, vec2(u, 1.0 - v));
+}
+// ---- the house background: stars, a warm glow low at the front, cool at the back
+float hash13(vec3 p){ p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }
+vec3 starLayer(vec3 d, float scale, float density){
+  vec3 p = d * scale; vec3 c = floor(p); vec3 f = fract(p);
+  float h = hash13(c);
+  vec3 sp = vec3(hash13(c + 1.7), hash13(c + 5.3), hash13(c + 9.1)) * 0.8 + 0.1;
+  float dist = length(f - sp);
+  float rad = max(0.06, 1.2 * length(fwidth(p)));
+  float b = step(1.0 - density, h) * (1.0 - smoothstep(rad * 0.4, rad, dist)) * (0.35 + 0.65 * hash13(c + 7.7));
+  return b * mix(vec3(1.0, 0.86, 0.72), vec3(0.72, 0.86, 1.0), hash13(c + 3.3));
+}
+vec3 stars(vec3 d){ return starLayer(d, 60.0, 0.035) + 0.55 * starLayer(d, 150.0, 0.02); }
+vec3 houseSky(vec3 room, float k){
+  float el = elOf(room), az = azOf(room);
+  float front = 0.5 + 0.5 * cos(az * DEG);
+  vec3 warm = vec3(0.10, 0.045, 0.015), cool = vec3(0.012, 0.03, 0.07);
+  vec3 c = mix(cool, warm, front) * exp(-max(el, 0.0) / 28.0) * k;
+  return c + vec3(0.004, 0.005, 0.008);
+}
+
+// ---- the instrument
+uniform float uFrameDome, uMesh, uDir, uRimEl;
+uniform vec3 uCam;
+uniform mat3 uCamRot;                 // view -> world (the camera's pitch)
+uniform vec3 uSph[${NS}];
+uniform mat3 uRot[${NS}];             // world -> sphere frame
+uniform vec3 uSphCol[${NS}];
+// uData rows: 0-2 lines of sphere k sorted by band (az, band bottom, visibility, s since hit) ·
+// 3-5 their colours · 6-8 readers (az, band bottom, visibility, trail) · 9-11 per band: (first line, count)
+uniform highp sampler2D uData;
+uniform float uNRd[${NS}], uBMin;
+uniform vec4 uHover;                  // az, band bottom, alpha, sphere
+uniform float uOutside;               // 0 inside a sphere .. 1 out in the void
+
+float across(vec3 l, float azDeg){ float a = azDeg * DEG; return asin(clamp(dot(l, vec3(cos(a), -sin(a), 0.0)), -1.0, 1.0)) / DEG; }
+float facing(vec3 l, float azDeg){ float a = azDeg * DEG; return dot(l.xy, vec2(sin(a), cos(a))); }
+float bandMask(float h, float lo, float w){ return smoothstep(lo - 0.5 * w, lo + 0.25 * w, h) * (1.0 - smoothstep(lo + ${B} - 0.25 * w, lo + ${B} + 0.5 * w, h)); }
+
+// a far field of wire spheres: the void
+vec3 voidSpheres(vec3 d){
+  vec3 p = d * 7.0; vec3 c = floor(p); vec3 f = fract(p);
+  float h = hash13(c + 17.0);
+  if (h < 0.72) return vec3(0.0);
+  vec3 ctr = vec3(hash13(c + 2.1), hash13(c + 4.7), hash13(c + 8.3)) * 0.5 + 0.25;
+  float rad = 0.06 + 0.16 * hash13(c + 6.6);
+  vec3 q = f - ctr; float r = length(q);
+  float w = max(0.012, 1.2 * length(fwidth(p)));
+  float ring = 1.0 - smoothstep(w * 0.5, w, abs(r - rad));
+  float eq = (1.0 - smoothstep(w * 0.5, w, abs(q.y))) * step(r, rad);
+  float mer = (1.0 - smoothstep(w * 0.5, w, abs(q.x))) * step(r, rad);
+  float k = 0.06 + 0.10 * hash13(c + 9.9);
+  return mix(vec3(0.55, 0.6, 0.7), vec3(0.7, 0.55, 0.5), hash13(c + 1.3)) * max(ring, max(eq, mer) * 0.6) * k;
+}
+
+vec3 shade(int k, vec3 q, float t, float back){
+  vec3 u = uRot[k] * normalize(q - uSph[k]);
+  float el = elOf(u), h = el - uRimEl;
+  float w = max(1.0, t);                                  // line widths grow with distance: about constant on screen
+  vec3 c = vec3(0.0);
+  float ring = aaLine(abs(fract(h / ${B} + 0.5) - 0.5) * ${B}, 0.22 * w);
+  float mer = 0.0;
+  for (int i = 0; i < 12; i++) mer = max(mer, aaLine(across(u, float(i) * ${MER_DEG.toFixed(1)}), 0.22 * w));
+  mer *= 1.0 - smoothstep(74.0, 87.0, abs(el));
+  float mesh = max(ring, mer);
+  c += mix(vec3(0.52, 0.55, 0.60), uSphCol[k], 0.25 * uOutside) * mesh * uMesh;
+
+  if (uHover.z > 0.0 && int(uHover.w + 0.5) == k) {
+    float bm = bandMask(h, uHover.y, w), d = across(u, uHover.x);
+    c += vec3(0.55, 0.6, 0.7) * (aaLine(d, 0.7 * w) * 0.55 + exp(-d * d / (10.0 * w * w)) * 0.08) * bm * step(0.0, facing(u, uHover.x)) * uHover.z;
+  }
+  float pb = floor(h / ${B});
+  for (int db = -2; db <= 2; db++) {
+   int x = int(pb - uBMin) + db;
+   if (x < 0 || x >= ${TEX_W}) continue;
+   vec4 rg = texelFetch(uData, ivec2(x, 9 + k), 0);
+   if (rg.y < 0.5) continue;
+   bool near = abs(db) <= 1;
+   for (int jj = 0; jj < ${MAX_L}; jj++) {
+    if (float(jj) >= rg.y) break;
+    int j = int(rg.x) + jj;
+    vec4 P = texelFetch(uData, ivec2(j, k), 0);
+    vec3 lc = texelFetch(uData, ivec2(j, 3 + k), 0).rgb;
+    if (P.z <= 0.0 || (!near && P.w > 2.0)) continue;
+    float bm = bandMask(h, P.y, w);
+    if (bm <= 0.0 && P.w > 2.0) continue;
+    float d = across(u, P.x), f = step(0.0, facing(u, P.x)), hit = exp(-P.w * 4.0);
+    c += mix(vec3(0.95), lc * 1.5, hit) * aaLine(d, 0.7 * w) * bm * f * P.z * (1.0 + 1.2 * hit);
+    c += lc * exp(-d * d / (6.0 * w * w)) * bm * f * P.z * (0.04 + 0.5 * hit);
+    c += lc * bm * 0.07 * exp(-P.w * 6.0) * P.z;
+    if (P.w < 2.0) {
+      float a = angleBetween(u, dirRoom(P.x, uRimEl + P.y + ${(BAND_DEG / 2).toFixed(1)}));
+      c += lc * aaLine(a - (4.0 + 42.0 * P.w), (0.5 + 2.5 * P.w) * w) * exp(-P.w * 2.2) * 0.6 * P.z * (0.5 + 0.8 * mesh);
+    }
+   }
+  }
+  for (int j = 0; j < ${MAX_R}; j++) {
+    if (float(j) >= uNRd[k]) break;
+    vec4 R = texelFetch(uData, ivec2(j, 6 + k), 0);
+    if (R.z <= 0.0 || abs(R.y + ${(BAND_DEG / 2).toFixed(1)} - h) > ${(BAND_DEG / 2).toFixed(1)} + w) continue;
+    float bm = bandMask(h, R.y, w);
+    if (bm <= 0.0) continue;
+    float d = across(u, R.x), f = step(0.0, facing(u, R.x));
+    float behind = max(-d * uDir, 0.0);
+    float trail = (behind > 0.0 ? exp(-behind / max(R.w, 0.5)) : 0.0) * 0.30;
+    c += uSphCol[k] * (aaLine(d, 0.9 * w) * 1.2 + exp(-d * d / (4.0 * w * w)) * 0.25 + trail) * bm * f * R.z;
+  }
+  return c * mix(1.0, 0.35, back) * exp(-max(t - 1.0, 0.0) * 0.04);
+}
+
+vec3 slideColor(vec3 room, vec3 local){
+  vec3 d = uCamRot * (uFrameDome > 0.5 ? local : room);   // a direction in the WORLD
+  vec3 c = houseSky(room, 0.5) * (1.0 - 0.6 * uOutside) + stars(room) * 0.30 + voidSpheres(d) * (0.35 + 0.65 * uOutside);
+  for (int k = 0; k < ${NS}; k++) {
+    vec3 oc = uCam - uSph[k];
+    float b = dot(oc, d), cc = dot(oc, oc) - 1.0, disc = b * b - cc;
+    if (disc < 0.0) continue;
+    float sq = sqrt(disc), t0 = -b - sq, t1 = -b + sq;
+    if (t1 <= 0.0) continue;
+    if (t0 > 0.0) {                                       // outside: near side, far side seen through the mesh
+      vec3 n = normalize(uCam + d * t0 - uSph[k]);
+      c += uSphCol[k] * pow(1.0 - abs(dot(n, d)), 3.0) * 0.18;   // a faint glow at the edge, in the sphere's colour
+      c += shade(k, uCam + d * t0, t0, 0.0);
+      c += shade(k, uCam + d * t1, t1, 1.0);
+    } else {
+      c += shade(k, uCam + d * t1, t1, 0.0);              // inside: the sphere around us
+    }
+  }
+  vec4 e = sampleEq(uEq, room); c = mix(c, e.rgb, e.a);
+  return c;
+}
+
+// ---- guides, for working, never for delivery
+vec3 guides(vec3 col, vec3 room, float r){
+  float el = elOf(room), az = azOf(room);
+  if (uGuide > 0.5) {
+    float aaz = abs(az);                                  // comfortable zone: in FRONT, BAND.x..BAND.y up, ±BAND.z
+    float inZone = step(BAND.x, el) * step(el, BAND.y) * step(aaz, BAND.z);
+    col = mix(col, col + vec3(0.05, 0.10, 0.06), inZone * 0.9);
+    float edge = max(max(aaLine(el - BAND.x, 0.25), aaLine(el - BAND.y, 0.25)) * step(aaz, BAND.z),
+                     aaLine((aaz - BAND.z) * cos(el * DEG), 0.25) * step(BAND.x, el) * step(el, BAND.y));
+    col = mix(col, vec3(0.35, 0.95, 0.55), edge * 0.85);
+    float a = angleBetween(room, dirRoom(0.0, SWEET_EL)); // sweet spot: straight ahead, SWEET_EL up
+    col = mix(col, col + vec3(0.10, 0.08, 0.02), (1.0 - smoothstep(11.0, 12.0, a)) * 0.9);
+    col = mix(col, vec3(1.0, 0.85, 0.3), aaLine(a - 12.0, 0.35));
+    col = mix(col, vec3(1.0, 0.85, 0.3), 1.0 - smoothstep(1.2, 1.6, a));
+  }
+  if (uFront > 0.5) {                                     // the rim, and a mark at the front
+    col = mix(col, vec3(1.0, 0.25, 0.25), aaLine((r - 1.0) * FOV * 0.5, 0.4));
+    col = mix(col, vec3(1.0, 0.25, 0.25), (1.0 - smoothstep(0.4, 0.6, abs(az))) * step(el, 10.0));
+  }
+  return col;
+}
+
+void main(){
+  vec2 m = gl_FragCoord.xy / uRes * 2.0 - 1.0;            // -1..1, y up; the front of the room is at the bottom
+  float r = length(m);
+  if (r > 1.0) { frag = vec4(0.0, 0.0, 0.0, 1.0); return; }
+  vec3 local = masterToLocal(m);
+  vec3 room = localToRoom(local);
+  frag = vec4(clamp(guides(slideColor(room, local), room, r), 0.0, 1.0), 1.0);
+}`;
+const VS = `#version 300 es
+in vec2 p; void main(){ gl_Position = vec4(p, 0.0, 1.0); }`;
+
+function sh(type, src) {
+  const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.error(gl.getShaderInfoLog(s)); say('Shader error: see the console.'); }
+  return s;
+}
+const prog = gl.createProgram();
+gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS));
+gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
+gl.linkProgram(prog);
+if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) console.error(gl.getProgramInfoLog(prog));
+gl.useProgram(prog);
+gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+const aP = gl.getAttribLocation(prog, 'p');
+gl.enableVertexAttribArray(aP); gl.vertexAttribPointer(aP, 2, gl.FLOAT, false, 0, 0);
+const U = {};
+for (const n of ['uRes', 'uGuide', 'uFront', 'uEq', 'uFrameDome', 'uMesh', 'uDir', 'uRimEl', 'uCam', 'uCamRot', 'uSph[0]', 'uRot[0]', 'uSphCol[0]', 'uData', 'uNRd[0]', 'uBMin', 'uHover', 'uOutside'])
+  U[n.replace('[0]', '')] = gl.getUniformLocation(prog, n);
+gl.uniform3fv(U.uSphCol, SPHERES.flatMap((s) => hexRGB(s.col)));
+
+// the data texture: lines and readers for the shader, rewritten every frame
+const data = new Float32Array(TEX_W * 12 * 4);
+const put = (x, y, a, b, c, d) => { const i = (y * TEX_W + x) * 4; data[i] = a; data[i + 1] = b; data[i + 2] = c; data[i + 3] = d; };
+const dataTex = gl.createTexture();
+gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, dataTex);
+gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, TEX_W, 12, 0, gl.RGBA, gl.FLOAT, data);
+for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.NEAREST], [gl.TEXTURE_MAG_FILTER, gl.NEAREST], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+gl.uniform1i(U.uData, 0);
+
+// text in ANGLES: a 2D canvas laid out as az -180..180 (front in the middle) × el -30..90.
+// Whatever is drawn here lands on the dome at that azimuth / elevation. Sizes are in degrees.
+class AngleCanvas {
+  constructor(width = 2048) {
+    this.w = width; this.h = Math.round(width / 3);
+    this.canvas = document.createElement('canvas'); this.canvas.width = this.w; this.canvas.height = this.h;
+    this.ctx = this.canvas.getContext('2d');
+    this.ppd = this.w / 360;              // pixels per degree (at the horizon)
+    this.dirty = true;
+  }
+  x(az) { return (((az + 180) % 360 + 360) % 360 - 180) / 360 * this.w + this.w / 2; }
+  y(el) { return ((90 - el) / 120) * this.h; }
+  clear() { this.ctx.clearRect(0, 0, this.w, this.h); return this; }
+  commit() { this.dirty = true; return this; }
+  /** text centred on (az, el). size = cap height in degrees. Corrects the horizontal squeeze at height. */
+  text(str, az, el, { size = 3, color = '#fff', weight = 600, alpha = 1 } = {}) {
+    const c = this.ctx, x0 = this.x(az);
+    for (const x of [x0, x0 < this.w * 0.2 ? x0 + this.w : null, x0 > this.w * 0.8 ? x0 - this.w : null]) {
+      if (x === null) continue;
+      c.save(); c.globalAlpha = alpha; c.translate(x, this.y(el));
+      c.scale(1 / Math.max(0.2, Math.cos(el * D)), 1);
+      c.font = `${weight} ${size * this.ppd * 1.38}px "Inter","Segoe UI","Helvetica Neue",Helvetica,Arial,sans-serif`;
+      c.fillStyle = color; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillText(str, 0, 0); c.restore();
+    }
+    return this;
+  }
+}
+const ac2 = new AngleCanvas(2048);
+const eqTex = gl.createTexture();
+gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, eqTex);
+for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR], [gl.TEXTURE_WRAP_S, gl.REPEAT], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+gl.uniform1i(U.uEq, 1);
+function uploadEq() {
+  gl.activeTexture(gl.TEXTURE1);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, ac2.canvas);
+  gl.generateMipmap(gl.TEXTURE_2D);
+  ac2.dirty = false;
+}
+
+// the HUD (and the note names) on the dome, redrawn only when they change
+let stats = null, rtShown = null, labelKey = '';
+const hudText = () => (stats ? `${stats.voices} voices · ${stats.hums} hums · ${stats.notesPerSec} notes/s · limiter ${stats.reduction} dB · real-time ${rtShown ?? '…'} %` : 'synth: press Start sound');
+function drawLabels(sc, s) {
+  const k = sc.restingIn(s);
+  const show = view.p('names') && k >= 0;
+  if (stats?.rt !== undefined) rtShown = stats.rt;
+  const hud = view.p('hud') ? hudText() : '';
+  const key = (show ? [k, sc.frame, view.p('scale'), ...(sc.rots[k] || [0, 0]).map((v) => v.toFixed(1))].join('|') : 'off') + hud;
+  if (key === labelKey) return;
+  labelKey = key;
+  ac2.clear();
+  if (hud) ac2.text(hud, 0, -9, { size: 1.15, weight: 500, color: MUTE, alpha: 0.9 });
+  if (show) {
+    for (let b = bMin(sc.frame); b < nBands(sc.frame); b++) {
+      const at = worldToRoomAzEl(sc.frame, sc.worldToView(s, mv(sc.M[k], dirRoom(-4, sc.rim + b * BAND_DEG + BAND_DEG / 2))));
+      ac2.text(labelOf(k, b, view), at.az, at.el, { size: 1.5, weight: 600, color: lineColor(k, b), alpha: 0.85 });
+    }
+  }
+  ac2.commit();
+}
+
+let hover = null, hoverAt = -1e9, guide = 0, front = 0;
+const lineRGB = new Map();
+const rgbOf = (k, band) => { const key = k * 100 + band; if (!lineRGB.has(key)) lineRGB.set(key, hexRGB(lineColor(k, band))); return lineRGB.get(key); };
+
+function render(t) {
+  const sc = score(view, t), s = sc.s;
+  drawLabels(sc, s);
+  if (ac2.dirty) uploadEq();
+  gl.uniform2f(U.uRes, cv.width, cv.height);
+  gl.uniform1f(U.uGuide, guide); gl.uniform1f(U.uFront, front);
+  gl.uniform1f(U.uFrameDome, sc.frame === 'room' ? 0 : 1);
+  gl.uniform1f(U.uRimEl, sc.rim);
+  gl.uniform1f(U.uMesh, view.p('mesh'));
+  gl.uniform1f(U.uDir, sc.dir);
+  const cs = sc.camState(s);
+  gl.uniform3f(U.uCam, ...cs.p);
+  const ca = Math.cos(cs.a * D), sa = Math.sin(cs.a * D);
+  gl.uniformMatrix3fv(U.uCamRot, false, [1, 0, 0, 0, ca, sa, 0, -sa, ca]);   // column by column
+  const ins = sc.insideAt(s);
+  const dist = ins >= 0 ? 0 : Math.min(...[0, 1, 2].map((k) => len(sub(sc.camAt(s), sc.centre(k, s)))));
+  gl.uniform1f(U.uOutside, ins >= 0 ? 0 : Math.min(1, (dist - 1) / 2));
+  const sph = [], rot = [], nrd = [];
+  for (let k = 0; k < NS; k++) {
+    sph.push(...sc.centre(k, s));
+    const M = sc.M[k];   // world -> sphere = transpose(M): its columns are M's rows
+    rot.push(...M[0], ...M[1], ...M[2]);
+    const sp = sc.spheres[k];
+    let n = 0;
+    for (const r of sp.readers) {
+      const vis = readerFade(r, s);
+      if (vis <= 0 || n >= MAX_R) continue;
+      put(n++, 6 + k, r.az(s), r.band * BAND_DEG, vis, r.speed(s) * 0.08);
+    }
+    for (let j = n; j < MAX_R; j++) put(j, 6 + k, 0, 0, 0, 0);
+    nrd.push(n);
+    // lines, sorted by band, with where each band's lines start
+    const ls = sp.lines.map((l) => ({ l, vis: fadeOf(s, l.appear, l.gone, l.fade) })).filter((o) => o.vis > 0).slice(0, MAX_L).sort((a, b) => a.l.band - b.l.band);
+    for (let x = 0; x < TEX_W; x++) put(x, 9 + k, 0, 0, 0, 0);
+    ls.forEach(({ l, vis }, j) => {
+      put(j, k, l.az, l.band * BAND_DEG, vis, Math.min(sinceHit(sc, sp, l, s), 99));
+      const c = rgbOf(k, l.band); put(j, 3 + k, c[0], c[1], c[2], 1);
+      const x = l.band - bMin(sc.frame), i = ((9 + k) * TEX_W + x) * 4;
+      if (data[i + 1] === 0) data[i] = j;
+      data[i + 1] += 1;
+    });
+  }
+  gl.uniform3fv(U.uSph, sph); gl.uniformMatrix3fv(U.uRot, false, rot); gl.uniform1fv(U.uNRd, nrd);
+  gl.uniform1f(U.uBMin, bMin(sc.frame));
+  gl.activeTexture(gl.TEXTURE0);
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, TEX_W, 12, gl.RGBA, gl.FLOAT, data);
+  const age = (performance.now() - hoverAt) / 1000;
+  const hp = hover && age < 3 ? sc.pick(hover.az, hover.el, s) : null;
+  if (hp && hp.cell) gl.uniform4f(U.uHover, hp.cell.az, hp.cell.band * BAND_DEG, Math.min(1, 3 - age), hp.k); else gl.uniform4f(U.uHover, 0, 0, 0, 0);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+
+// =====================================================================================
+// 7 · THE SOUND: the feeder (here, every 20 ms) and the synth (on the audio thread)
+// =====================================================================================
+let node = null, outGain = null, outCh = 2, feedMs = 0, feeder = null;
+const posted = { notes: 0, hums: 0, messages: 0 };
+const panGains = (at, dist, lfe = 0) => { const g = Array.from(gains51(at.az, at.el * PAN_EL), (x) => x * dist); g[3] = lfe * dist; return g; };
+const done = new Map();
+let lastStart = null;
+
+function update(t) {
+  if (!node) return;
+  const tStart = performance.now();
+  const sc = score(view, t), s = sc.s;
+  if (sc.start !== lastStart) { lastStart = sc.start; done.clear(); node.port.postMessage({ type: 'reset' }); }
+  const cam = sc.camAt(s);
+  const fromCam = (k, az, band) => worldToRoomAzEl(sc.frame, sc.worldToView(s, sub(sc.worldPoint(k, az, band * BAND_DEG + BAND_DEG / 2, s), cam)));
+  const gain = [0, 1, 2].map((k) => gainOf(sc, k, s));
+
+  // hums: the loudest HUM_MAX readers, as a list of "what should hum now"
+  const cands = [];
+  for (let k = 0; k < NS; k++) {
+    const live = sc.spheres[k].readers.filter((r) => readerFade(r, s) > 0);
+    const share = 1 / Math.sqrt(Math.max(1, live.length));
+    for (const r of live) cands.push({ k, r, loud: gain[k] * share * readerFade(r, s) });
+  }
+  cands.sort((a, b) => b.loud - a.loud);
+  const hums = cands.slice(0, HUM_MAX).map(({ k, r, loud }) => {
+    const at = fromCam(k, r.az(s), r.band);
+    const f = (k === 1 ? 200 * Math.pow(2, r.band / 3) : noteOf(r.band, scaleOf(k, view)).freq) / 2;
+    return { id: `${k}:${r.id}`, bank: k, f, gain: view.p('hum') * 0.20 * (0.8 + 0.2 * (0.5 + 0.5 * Math.cos(at.az * D))), g: panGains(at, loud, 0.2) };
+  });
+  node.port.postMessage({ type: 'hums', list: hums });
+  posted.hums = hums.length; posted.messages++;
+
+  // notes: the next 250 ms, and up to LATE back (a click that starts a reader on a line is a
+  // hit AT the click). Only lines in a reader's band.
+  const nlen = view.p('note'), vol = view.p('vol'), now = ac.currentTime;
+  const hits = [];
+  for (let k = 0; k < NS; k++) {
+    if (gain[k] < 0.003) continue;                          // too far away to hear: skip the sphere
+    const sp = sc.spheres[k];
+    for (const [band, rs] of sp.readersByBand) {
+      const ls = sp.linesByBand.get(band); if (!ls) continue;
+      for (const r of rs) for (const l of ls) for (const hit of hitsBetween(sc, r, l, s - LATE, s + 0.25)) {
+        const key = `${k}:${r.id}:${l.id}:${hit.n}`;
+        if (done.has(key)) continue;
+        done.set(key, hit.at);
+        const when = ctxTime(sc.start + hit.at);
+        if (when < now - LATE) continue;
+        hits.push({ k, l, when: Math.max(when, now) });
+      }
+    }
+  }
+  if (hits.length) {
+    // notes that land together share the loudness (1/√n), so a chord of 8 is not 8× as loud
+    const together = new Map();
+    for (const h of hits) { const key = `${h.k}:${Math.round(h.when * 20)}`; together.set(key, (together.get(key) || 0) + 1); }
+    node.port.postMessage({ type: 'notes', list: hits.map(({ k, l, when }) => {
+      const at = fromCam(k, l.az, l.band);
+      const kind = k === 1 ? drumOf(l.band) : null;
+      const lfe = k === 1 && /Kick|Tom|Conga/.test(kind) ? 0.5 : 0;
+      return { when, bank: k, kind, line: `${k}:${l.id}`,
+        f: k === 0 ? noteOf(l.band, view.p('scale')).freq : k === 2 ? noteOf(l.band, 'guitar').freq : 0,
+        len: nlen, vol: vol / Math.sqrt(together.get(`${k}:${Math.round(when * 20)}`)), g: panGains(at, gain[k], lfe) };
+    }) });
+    posted.notes += hits.length; posted.messages++;
+  }
+  if (Math.random() < 0.05) for (const [key, at2] of done) if (at2 < s - 5) done.delete(key);
+  feedMs += (performance.now() - tStart - feedMs) * 0.1;
+}
+
+let audioMode = '', workletFrom = '';
+async function startSound() {
+  if (ac) { if (ac.state !== 'running') await ac.resume(); return; }
+  ac = new AudioContext({ latencyHint: 'interactive' });
+  const d = ac.destination;
+  const forceStereo = new URLSearchParams(location.search).get('out') === 'stereo';
+  // six discrete channels if the device has them (Dante Virtual Soundcard set to 5.1, the Dante box),
+  // otherwise the synth folds its 5.1 mix down to stereo itself
+  outCh = d.maxChannelCount >= 6 && !forceStereo ? 6 : 2;
+  d.channelCount = outCh; d.channelCountMode = 'explicit'; d.channelInterpretation = outCh === 6 ? 'discrete' : 'speakers';
+  audioMode = outCh === 6 ? `5.1, six discrete channels (L R C LFE Ls Rs), device has ${d.maxChannelCount}` : `stereo (the synth folds 5.1 down), device has ${d.maxChannelCount} channel${d.maxChannelCount === 1 ? '' : 's'}`;
+  // the synth's code comes from the page itself: a Blob URL (served pages), or a data: URL when the
+  // page was opened from disk (Chrome refuses both a file:// module and, there, a Blob URL)
+  const src = document.getElementById('worklet-src').textContent;
+  const blobUrl = URL.createObjectURL(new Blob([src], { type: 'application/javascript' }));
+  const dataUrl = 'data:application/javascript;base64,' + btoa(unescape(encodeURIComponent(src)));
+  let loaded = null;
+  for (const [how, url] of location.protocol === 'file:' ? [['data: URL', dataUrl], ['Blob URL', blobUrl]] : [['Blob URL', blobUrl], ['data: URL', dataUrl]]) {
+    try { await ac.audioWorklet.addModule(url); loaded = how; break; } catch (e) { console.info(`EX-12: the synth did not load from a ${how}`, e.message); }
+  }
+  URL.revokeObjectURL(blobUrl);
+  if (!loaded) { say('The synth did not load: see the console.'); console.error('EX-12: the synth did not load'); return; }
+  workletFrom = loaded;
+  node = new AudioWorkletNode(ac, 'ex12-synth', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [outCh] });
+  // a gain for Mute; explicit and discrete, so the six channels pass through untouched
+  outGain = new GainNode(ac, { channelCount: outCh, channelCountMode: 'explicit', channelInterpretation: 'discrete' });
+  node.connect(outGain).connect(d);
+  // stats for the HUD, plus "real-time": how fast the audio clock runs against the wall clock.
+  // 100 % = the synth keeps up; below that the audio thread is overloaded (you hear crackles).
+  let w0 = performance.now(), a0 = ac.currentTime;
+  node.port.onmessage = (e) => {
+    const w1 = performance.now(), a1 = ac.currentTime;
+    const rt = w1 - w0 > 200 ? Math.min(100, Math.round(100 * (a1 - a0) * 1000 / (w1 - w0))) : null;
+    if (rt !== null) { w0 = w1; a0 = a1; }
+    stats = { ...e.data, rt: rt ?? stats?.rt, feed: +feedMs.toFixed(2) };
+  };
+  if (ac.state !== 'running') await ac.resume();
+  // switch the clock over to the audio clock without a jump
+  const before = clock();
+  clockOffset = before - audioNow();
+  audioOn = true;
+  lastStart = null;
+  feeder = setInterval(() => update(clock()), 20);
+  say(audioMode);
+  document.getElementById('start').textContent = 'Sound on: click to mute';
+}
+let muted = false;
+document.getElementById('start').addEventListener('click', async (e) => {
+  if (!node) { await startSound(); return; }
+  muted = !muted;
+  outGain.gain.setTargetAtTime(muted ? 0 : 1, ac.currentTime, 0.02);
+  e.target.textContent = muted ? 'Muted: click for sound' : 'Sound on: click to mute';
+});
+
+// =====================================================================================
+// 8 · THE PAGE: canvas size, controls, mouse, keys, loop
+// =====================================================================================
+const q = new URLSearchParams(location.search);
+let QUALITY = +(q.get('q') || 1024);
+const qSel = document.getElementById('quality');
+qSel.value = String(QUALITY); if (!qSel.value) { qSel.value = '1024'; QUALITY = 1024; }
+qSel.addEventListener('change', () => { QUALITY = +qSel.value; resize(); });
+function resize() {
+  const full = !!document.fullscreenElement;
+  const css = Math.max(256, Math.floor(Math.min(full ? screen.width : innerWidth, full ? screen.height : innerHeight)));
+  cv.width = cv.height = QUALITY;          // the master's resolution
+  cv.style.width = cv.style.height = css + 'px';   // the size on this screen
+  gl.viewport(0, 0, QUALITY, QUALITY);
+}
+addEventListener('resize', resize);
+document.addEventListener('fullscreenchange', () => {
+  resize();
+  if (!document.fullscreenElement) { document.getElementById('ui').classList.remove('hidden'); document.getElementById('toggle').textContent = 'hide'; }
+});
+resize();
+
+// controls, made from PARAMS
+const ctlEls = {};
+for (const [k, d] of Object.entries(PARAMS)) {
+  const row = document.createElement('div'); row.className = 'row';
+  const id = 'p_' + k;
+  row.innerHTML = `<label for="${id}">${d.label}</label>`;
+  let el;
+  if (d.type === 'range') {
+    el = Object.assign(document.createElement('input'), { type: 'range', id, min: d.min, max: d.max, step: d.step });
+    const v = document.createElement('span'); v.className = 'v';
+    el.addEventListener('input', () => setParam(k, +el.value));
+    row.append(el, v); el._v = v;
+  } else if (d.type === 'toggle') {
+    el = Object.assign(document.createElement('input'), { type: 'checkbox', id });
+    el.addEventListener('change', () => setParam(k, el.checked));
+    row.append(el);
+  } else {
+    el = document.createElement('select'); el.id = id;
+    for (const [v, t] of d.options) el.append(new Option(t, v));
+    el.addEventListener('change', () => setParam(k, el.value));
+    row.append(el);
+  }
+  ctlEls[k] = el;
+  document.getElementById(d.group === 'stress' ? 'p-stress' : 'p-more').append(row);
+}
+function syncControl(k) {
+  const el = ctlEls[k], d = PARAMS[k]; if (!el) return;
+  if (d.type === 'toggle') el.checked = !!P[k]; else el.value = P[k];
+  if (el._v) el._v.textContent = (+P[k]).toFixed(d.step < 1 ? (d.step < 0.1 ? 2 : 1) : 0) + (d.unit || '');
+}
+// URL overrides: ?t=31 jumps the score, ?q=2048 picture size, ?extra=120&extraR=2, ?names=1, ?guides=1 …
+for (const [k, d] of Object.entries(PARAMS)) {
+  if (q.has(k)) { const v = q.get(k); P[k] = d.type === 'range' ? +v : d.type === 'toggle' ? v === '1' || v === 'true' : v; lastSet[k] = S.start; }
+  syncControl(k);
+}
+if (q.has('t')) S.start = clock() - +q.get('t');
+if (q.get('guides') === '1') guide = 1;
+if (q.get('fly') === 'out') (S.presses.flyout ||= []).push(S.start);
+
+for (const b of document.querySelectorAll('[data-press]')) b.addEventListener('click', () => press(b.dataset.press));
+document.getElementById('restart').addEventListener('click', restart);
+const togglePanel = () => {
+  const ui = document.getElementById('ui'); ui.classList.toggle('hidden');
+  document.getElementById('toggle').textContent = ui.classList.contains('hidden') ? 'show' : 'hide';
+};
+document.getElementById('toggle').addEventListener('click', togglePanel);
+document.getElementById('dome').addEventListener('click', () => {
+  document.getElementById('ui').classList.add('hidden');
+  document.getElementById('toggle').textContent = 'show';
+  document.documentElement.requestFullscreen?.();
+});
+document.getElementById('shot').addEventListener('click', () => {
+  cv.toBlob((b) => {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(b);
+    a.download = `orbit-synth_domemaster_${cv.width}x${cv.height}.png`; a.click();
+  }, 'image/png');
+});
+addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'SELECT' || e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if (k === 'g') guide = 1 - guide;
+  else if (k === 'f') front = 1 - front;
+  else if (k === 'h') togglePanel();
+  else if (k === 'i') setParam('hud', !P.hud);
+  else if (k === 'r') restart();
+  else if (k === 'n') press('step');
+  else if (k === 'o') press('flyout');
+  else if (k === 'c') press('clear');
+  else if (k === '1' || k === '2' || k === '3') press('in' + (+k - 1));
+});
+
+// the mouse on the master: hover, click / double click, shift + drag
+const toRoom = (e) => { const r = cv.getBoundingClientRect(); return masterXYToRoom((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height); };
+let down = null, dragging = false, lastDrag = 0, pending = null, idleTimer = null;
+cv.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY, shift: e.shiftKey, room: toRoom(e) }; dragging = false; cv.setPointerCapture(e.pointerId); });
+cv.addEventListener('pointermove', (e) => {
+  document.body.classList.remove('idle'); clearTimeout(idleTimer);
+  if (document.fullscreenElement) idleTimer = setTimeout(() => document.body.classList.add('idle'), 2000);
+  if (!e.buttons) { const d = toRoom(e); if (d) { hover = d; hoverAt = performance.now(); } }
+  if (!down || !e.buttons || !down.shift || !down.room) return;
+  const dx = e.clientX - down.x, dy = e.clientY - down.y, now = performance.now();
+  if (!dragging && Math.hypot(dx, dy) > 5) { dragging = true; onDrag({ phase: 'start', ...down.room, dx: 0, dy: 0 }); }
+  if (dragging && now - lastDrag > 50) { lastDrag = now; onDrag({ phase: 'move', ...down.room, dx, dy }); }
+});
+cv.addEventListener('pointerup', (e) => {
+  const d0 = down; down = null;
+  if (!d0) return;
+  if (dragging) { dragging = false; onDrag({ phase: 'end', ...d0.room, dx: e.clientX - d0.x, dy: e.clientY - d0.y }); return; }
+  if (Math.hypot(e.clientX - d0.x, e.clientY - d0.y) > 5) return;
+  const d = toRoom(e); if (!d) return;
+  const ev = { az: +d.az.toFixed(2), el: +d.el.toFixed(2), shift: e.shiftKey };
+  // hold a single click back ~280 ms to tell it from a double click
+  if (pending && performance.now() - pending.t < 300) { clearTimeout(pending.timer); pending = null; onClick({ ...ev, dbl: true }); }
+  else pending = { t: performance.now(), timer: setTimeout(() => { pending = null; onClick(ev); }, 280) };
+});
+
+// the loop
+const hudEl = document.getElementById('hud');
+let frames = 0, fps = 0, fpsT = performance.now();
+function loop() {
+  render(clock());
+  frames++;
+  const now = performance.now();
+  if (now - fpsT > 1000) {
+    fps = Math.round(frames * 1000 / (now - fpsT)); frames = 0; fpsT = now;
+    hudEl.textContent = `${stats ? hudText() + ` · feeder ${stats.feed} ms` : 'Sound off.'} · picture ${fps} fps at ${cv.width}²`;
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+// for tests and the console
+window.ex12 = { P, PARAMS, posted, setParam, press, restart, clock, onClick, startSound,
+  get stats() { return stats; }, get fps() { return fps; }, get audioMode() { return audioMode; }, get workletFrom() { return workletFrom; }, get state() { return S; },
+  get time() { return clock() - S.start; }, get outCh() { return outCh; },
+  world() { const sc = score(view, clock()); return { s: sc.s, inside: sc.insideAt(sc.s), lines: sc.spheres.map((x) => x.lines.length), readers: sc.spheres.map((x) => x.readers.length) }; } };
+</script>
+</body>
+</html>

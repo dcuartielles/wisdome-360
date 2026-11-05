@@ -36,3 +36,21 @@ Plan 5.1 or stereo early. Export one mono WAV per channel, 48 kHz / 16-bit, star
 4. Run the [delivery checklist](../reference/delivery-spec.md#checklist).
 
 MaU students: file names, deadline and upload are on [Hand-in](../course/hand-in.md).
+
+## 5. Playing it from your own laptop
+
+Some venues play your file from their own system. If you play the film from your own laptop instead, for example because the full-quality file is too big to hand in, connect it like a live piece: picture over HDMI, sound over Dante. See [Connecting a live piece](../reference/connecting.md).
+
+1. Make a playback copy with the 5.1 sound inside the MP4, so picture and sound stay together:
+
+    ```bash
+    ffmpeg -i film_2048x2048_30fps.mp4 \
+           -i film_L.wav -i film_R.wav -i film_C.wav -i film_LFE.wav -i film_Ls.wav -i film_Rs.wav \
+           -filter_complex "[1:a][2:a][3:a][4:a][5:a][6:a]join=inputs=6:channel_layout=5.1[a]" \
+           -map 0:v -map "[a]" -c:v copy -c:a aac -b:a 384k film_play.mp4
+    ```
+
+    For a stereo piece, use only the L and R files and `channel_layout=stereo` with `inputs=2`.
+2. Set the HDMI display to 3840 × 2160 and play the copy fullscreen on it, centred with black at the sides. [VLC](https://www.videolan.org/) or [mpv](https://mpv.io/) work; turn off any scaling that stretches the square.
+3. Send the player's sound to your Dante device (or, as a fallback, to the HDMI output in stereo).
+4. Play it once from start to finish before your slot, from the same laptop.

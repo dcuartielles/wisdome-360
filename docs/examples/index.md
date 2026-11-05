@@ -4,7 +4,7 @@ title: Examples
 
 # Examples
 
-Ten worked examples: one per tool, plus three utilities. Seven of them render or run as they stand; the other three are recipes with working code for software you install first. Each one makes the same five decisions on purpose (see [Where to put things](../reference/comfortable-zone.md#the-five-decisions-every-example-makes)), so once you have read one, the others are quick.
+Twelve worked examples: one per tool, three utilities, and an instrument in two versions. Nine of them render or run as they stand; the other three are recipes with working code for software you install first. Each one makes the same five decisions on purpose (see [Where to put things](../reference/comfortable-zone.md#the-five-decisions-every-example-makes)), so once you have read one, the others are quick.
 
 | # | Name | Tool | Film or live | What it shows |
 |---|---|---|---|---|
@@ -18,6 +18,8 @@ Ten worked examples: one per tool, plus three utilities. Seven of them render or
 | [EX-08](ex08-flat-to-dome.ipynb) | Flat to Dome | HTML / Python / ffmpeg | Either | Slides, photos and 16:9 video → dome master |
 | [EX-09](ex09-type-size.ipynb) | Type size | Python + Pillow | Either | Test card: how small can text be |
 | [EX-10](ex10-flight.ipynb) | Flight | Python + OpenCV | Either | Green-screen footage keyed and flown around the room |
+| [EX-11](ex11-orbit.md) | Orbit | WebGL + Web Audio | Live | The dome as a musical instrument: three spheres you write notes on, in 5.1 |
+| [EX-12](ex12-orbit-synth.md) | Orbit synth | WebGL + AudioWorklet | Live | The same instrument with its own synthesiser, and a stress test for how many voices your laptop can play |
 
 Not sure where to start? [Making a film](../make/film.md) and [Making a live piece](../make/live.md) each have a table that picks one for you.
 

@@ -102,6 +102,8 @@ nav:
       - EX-08 Flat to Dome: examples/ex08-flat-to-dome.ipynb
       - EX-09 Type size: examples/ex09-type-size.ipynb
       - EX-10 Flight: examples/ex10-flight.ipynb
+      - EX-11 Orbit (instrument): examples/ex11-orbit.md
+      - EX-12 Orbit synth (AudioWorklet): examples/ex12-orbit-synth.md
   - Problems: problems.md
   - MaU course 2026:
       - course/index.md

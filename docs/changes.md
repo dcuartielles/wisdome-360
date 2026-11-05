@@ -12,6 +12,10 @@ Changes since the first release, *protoclass*. They are already on this site.
 
 ### 2026-11-05
 
+- **Hand-in on Friday:** dome files by 08:00 for the dry run, final upload at the end of the day, both to the group assignment on Canvas. A video over 500 MB is uploaded as a reduced version and played in full from your own laptop. See [Hand-in](course/hand-in.md) and [playing a film from your laptop](make/film.md#5-playing-it-from-your-own-laptop).
+- **Times and rooms** for the week are now only on Canvas.
+- **New examples: EX-11 Orbit and EX-12 Orbit synth.** The dome as a musical instrument, in one browser page each: three spheres you write notes on, with 5.1 sound. EX-12 makes all its sound in its own synthesiser and has a stress test. See [Examples](examples/index.md).
+- **Wisdome teams:** you make and hand in your piece in a team of up to 3 people (Team 1–20 on Canvas). Seminars stay with your workshop group.
 - **Live pieces: picture over HDMI, sound over Dante.** The picture goes over HDMI at 3840 × 2160 with the dome master centred as a 2160² square; the 5.1 sound goes over Dante. If Dante fails, HDMI carries stereo sound. NDI is no longer used for student pieces. See [Connecting a live piece](reference/connecting.md). The setup wizard follows this.
 - **Corrected geometry, from the venue.** Wisdome spreads the whole circle of a dome master over its 160° screen, so **render the fisheye at 160°**, not 180°. The **sweet spot is about 20° above eye level**, not 40°, and the comfortable zone runs from the bottom of the screen at the front up to about 45°. Text sizes change with it: 1° = 12.8 px at 2K. See [Where to put things](reference/comfortable-zone.md).
 - **Examples updated to the new geometry:** files, pictures, pages and notebooks. The Dome Simulator uses the venue's 160° mapping.

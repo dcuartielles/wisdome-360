@@ -4,7 +4,7 @@ title: The week
 
 # The week, day by day
 
-Three sessions are fixed: the **lecture on Monday**, the **seminar on Wednesday** and the **dome on Friday**. The rest of the week is group work. Each day below ends with a checkpoint. If your group has everything on the list, you are on track. Times and rooms are on Canvas.
+Three sessions are fixed: the **lecture on Monday**, the **seminar on Wednesday** and the **dome on Friday**. The rest of the week is team work: you make your piece in a **Wisdome team** of up to 3 people (join one on Canvas), while seminars stay with your workshop group. Each day below ends with a checkpoint. If your group has everything on the list, you are on track. **Times and rooms are on Canvas**, on the week's page in your course (TEI 26 or EDT 26).
 
 <div class="w360-days" markdown>
 
@@ -13,18 +13,18 @@ Three sessions are fixed: the **lecture on Monday**, the **seminar on Wednesday*
 
 ### Meet the dome
 
-The introductory lecture: how the dome works, who has made work for domes before, and the tools you can use. In the afternoon your group chooses a track.
+The introductory lecture: how the dome works, who has made work for domes before, and the tools you can use. In the afternoon your team chooses a track.
 
 **By the end of the day:**
 
-- [ ] Your group exists and has a name (it goes into your file names).
+- [ ] Your team exists on Canvas (*People › Groups › Wisdome teams*, up to 3 people). Its name goes into your file names.
 - [ ] You have chosen **Track A** (a film) or **Track B** (live). See [Two tracks](index.md#two-tracks).
-- [ ] At least one laptop in the group has passed the [setup wizard](../setup/wizard.html) and shows the test card in the [Dome Simulator](../tools/dome-simulator.html).
+- [ ] At least one laptop in the team has passed the [setup wizard](../setup/wizard.html) and shows the test card in the [Dome Simulator](../tools/dome-simulator.html).
 - [ ] You have opened one [example](../examples/index.md) close to your idea and watched it in the simulator.
 </div>
 
 <div class="w360-day" markdown>
-<span class="when">Tuesday 10 November · group work</span>
+<span class="when">Tuesday 10 November · team work</span>
 
 ### Sketch in degrees
 
@@ -53,7 +53,7 @@ Plan the piece as positions in the room, not as a picture: where the subject is 
 </div>
 
 <div class="w360-day" markdown>
-<span class="when">Thursday 12 November · group work</span>
+<span class="when">Thursday 12 November · team work</span>
 
 ### Finish and render
 
@@ -71,11 +71,12 @@ Leave time for the final render: at 2048² a long piece takes hours, not minutes
 
 ### Dry run in the morning, presentations in the afternoon
 
-- **08:00** Track A files and Track B fallback recordings delivered. Late files miss the dry run.
-- **Morning:** dry run in the dome, in running order. Note what looks wrong; you can fix small things over lunch.
-- **Afternoon:** presentations. Three minutes per group to explain your decisions, in the dark, in the dome.
+- **08:00** Dome files uploaded to the group assignment on Canvas, one upload per team: Track A films, Track B fallback recordings. Over 500 MB, upload a reduced version and bring the full one on your laptop. Late files miss the dry run.
+- **Morning:** dry-run slots on the dome. Note what looks wrong; you can fix small things before the presentations.
+- **Afternoon:** presentations. Three minutes per team to explain your decisions, in the dark, in the dome.
+- **End of the day:** final upload of the piece and your presentation.
 
-Track B, bring: laptop and charger; an HDMI cable and any adapter your laptop needs; an Ethernet port or USB-Ethernet adapter for Dante; the fallback file on a USB stick. See [Hand-in](hand-in.md#friday).
+If you play from your laptop, bring it with its charger, an HDMI cable and any adapter it needs, and an Ethernet port or USB-Ethernet adapter for Dante. See [Hand-in](hand-in.md#friday).
 </div>
 
 </div>
