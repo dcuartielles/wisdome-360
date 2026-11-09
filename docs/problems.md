@@ -41,4 +41,4 @@ Find your symptom. If it isn't here, MaU students ask in the help-desk discussio
     They travel by different cables (HDMI and Dante), and OBS adds a frame or two. Delay the sound (or the picture) in your piece until a flash and a click line up, watched from the seats.
 
 ??? question "Everything looks smaller and pulled towards the middle"
-    You probably rendered a 180° fisheye. Wisdome spreads the whole circle over a 160° screen, so a 180° master is squeezed by 8/9. Render at **160°**: in Blender set the fisheye field of view to 160°; in TouchDesigner set FOV Angle to 160.
+    You probably rendered a 180° fisheye. Wisdome spreads the whole circle over a 160° screen, so a 180° master is squeezed by 8/9. Render at **160°**: in Blender set the fisheye field of view to 160°; in TouchDesigner the Render TOP's fisheye is fixed at 180°, so add a Transform TOP after it with Scale 1.125 (see [EX-05](examples/ex05-touchdesigner.md)).

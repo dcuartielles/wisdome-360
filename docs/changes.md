@@ -10,6 +10,11 @@ Every change to this site is listed here, newest first, grouped by release. If s
 
 Changes since v0.0.2, *venue*. They are already on this site.
 
+### 2026-11-09
+
+- **EX-05 TouchDesigner: a ready-made network.** A script that builds the whole dome network in TouchDesigner for you, and the saved `.toe`, with a screenshot. See [EX-05](examples/ex05-touchdesigner.md).
+- **Correction, TouchDesigner:** the fisheye is set on the **Render TOP** (*Render Mode* `Fish-Eye (180)`), not on the Camera COMP, and it is fixed at 180°. To get Wisdome's 160°, add a Transform TOP with Scale 1.125. Keep the camera at the centre (Translate `0 0 0`). See [EX-05](examples/ex05-touchdesigner.md) and [Problems](problems.md).
+
 ## v0.0.2 "venue" — 2026-11-06
 
 The corrections from the venue: 160° geometry, live pieces over HDMI and Dante, the Friday hand-in in teams, and two new examples.
