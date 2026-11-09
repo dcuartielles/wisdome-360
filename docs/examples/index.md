@@ -20,6 +20,7 @@ Twelve worked examples: one per tool, three utilities, and an instrument in two 
 | [EX-10](ex10-flight.ipynb) | Flight | Python + OpenCV | Either | Green-screen footage keyed and flown around the room |
 | [EX-11](ex11-orbit.md) | Orbit | WebGL + Web Audio | Live | The dome as a musical instrument: three spheres you write notes on, in 5.1 |
 | [EX-12](ex12-orbit-synth.md) | Orbit synth | WebGL + AudioWorklet | Live | The same instrument with its own synthesiser, and a stress test for how many voices your laptop can play |
+| [EX-13](ex13-simple-hdmi-dante.md) | Simple HDMI + Dante example | Node.js + Chrome (live slides) | Live | A small live slides kit with five commented demo slides: test image, title, 5.1 comet, carousel, dome film. Picture over HDMI, sound over Dante
 
 Not sure where to start? [Making a film](../make/film.md) and [Making a live piece](../make/live.md) each have a table that picks one for you.
 

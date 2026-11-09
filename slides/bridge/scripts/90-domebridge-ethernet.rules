@@ -1,0 +1,13 @@
+# The hub's USB Ethernet (RTL8153, driver r8152), whatever NetworkManager connection uses it:
+#
+# 1. Energy-Efficient Ethernet off. With it on, the bench saw rx_missed climbing and
+#    laptop→UNO Q pings timing out or taking up to 350 ms.
+# 2. Link at 100 Mb/s, not 1 Gb/s. With a DSI panel the USB-C port runs in forced host mode at
+#    USB 2 (480 Mb/s, see usb-host-mode.service). When the laptop catches up after a hiccup it
+#    bursts at line rate; at 1 Gb/s that overflowed the RTL8153's buffer (thousands of rx_missed,
+#    TCP retransmits, ~60 bridge underruns in 20 min). At 100 Mb/s the switch absorbs the burst:
+#    0 rx_missed, 1 underrun in 10 min. 100 Mb/s is >10x the bridge stream (9 Mb/s) + 6 ch Dante.
+#
+# Installed by bootstrap.sh. By hand:
+#   sudo install -m 644 90-domebridge-ethernet.rules /etc/udev/rules.d/ && sudo udevadm control --reload
+ACTION=="add", SUBSYSTEM=="net", DRIVERS=="r8152", RUN+="/usr/sbin/ethtool --set-eee %k eee off", RUN+="/usr/sbin/ethtool -s %k speed 100 duplex full autoneg on advertise 0x008"

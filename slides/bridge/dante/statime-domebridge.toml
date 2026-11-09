@@ -1,0 +1,18 @@
+# Statime (teodly's fork, branch inferno-dev) for the UNO Q bridge.
+# Based on inferno-ptpv1.toml from that fork. start-dante.sh fills in the interface.
+# Statime follows the Dante clock (PTPv1, the protocol Dante uses without AES67) and exports
+# it to Inferno over the usrvclock socket (/tmp/ptp-usrvclock). It never changes system time.
+loglevel = "info"            # the fork's example says "trace": far too chatty for a terminal
+
+sdo-id = 0
+domain = 0
+priority1 = 251              # never become leader; Dante Via / the venue's devices lead
+virtual-system-clock = true
+virtual-system-clock-base = "monotonic_raw"
+usrvclock-export = true
+
+[[port]]
+interface = "@IFACE@"
+network-mode = "ipv4"
+hardware-clock = "none"      # USB Ethernet: software timestamps only
+protocol-version = "PTPv1"

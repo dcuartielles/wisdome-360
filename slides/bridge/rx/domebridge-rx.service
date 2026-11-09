@@ -1,0 +1,18 @@
+# Start the bridge receiver at boot (after Statime + Inferno work by hand).
+#   sudo cp domebridge-rx.service /etc/systemd/system/ && sudo systemctl daemon-reload
+#   sudo systemctl enable --now domebridge-rx
+#   journalctl -u domebridge-rx -f          # its log
+[Unit]
+Description=Dome audio bridge receiver (laptop sound stream -> Inferno/Dante)
+After=network-online.target sound.target
+# start ../dante/start-dante.sh first (Statime + the 'dome' ALSA device)
+Wants=network-online.target
+
+[Service]
+# Runs as root: Inferno needs the clock socket and a high memory-lock limit (see ../dante/).
+ExecStart=/usr/bin/python3 /home/arduino/bridge/rx/domebridge_rx.py --device dome --log-every 30
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

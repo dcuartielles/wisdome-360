@@ -23,7 +23,9 @@ Anything imported keeps **its own licence**. It is listed below with its source,
 | Poppins (Bold, Regular) | Indian Type Foundry, [itfoundry/Poppins](https://github.com/itfoundry/Poppins) | SIL Open Font License 1.1 | Letter outlines in the Wisdome 360 wordmark (the dome-master "o" and the layout are ours, CC BY-SA 4.0). The font files are bundled with EX-09 Type size, with their licence (`Poppins-OFL.txt`) |
 | Inter (Thin, Light, Regular, Bold, Black) | The Inter Project Authors, [rsms/inter](https://github.com/rsms/inter) | SIL Open Font License 1.1 | Bundled with EX-09 Type size, with its licence (`Inter-OFL.txt`) |
 | Liberation Serif (Regular) | Google Corporation and Red Hat, [liberationfonts](https://github.com/liberationfonts/liberation-fonts) | SIL Open Font License 1.1 | Bundled with EX-09 Type size, with its licence (`LiberationSerif-OFL.txt`) |
+| Capture console test frame (`capture-console-3840x2160.jpg`) | Wisdome Malmö, shared by the venue's technicians for this course | Used with the venue's permission | [Connecting a live piece](reference/connecting.md) |
 | p5.js 2.3.1 (`p5.min.js`) | The Processing Foundation and contributors, [processing/p5.js](https://github.com/processing/p5.js) | GNU LGPL 2.1 | Bundled with EX-04 Chorus, unmodified, so the sketch runs offline |
+| three.js r170 (`three.module.min.js`) | Three.js Authors, [mrdoob/three.js](https://github.com/mrdoob/three.js) | MIT | Bundled with EX-13 Simple HDMI + Dante example and the lecture's live slides (`slides/vendor/`), unmodified, with its licence (`three.LICENSE`) |
 
 ### Footage and media not published here
 

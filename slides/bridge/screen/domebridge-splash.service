@@ -1,0 +1,18 @@
+# Vaporwave on the DSI screen from boot until the first touch, then the console comes back.
+# Uses the demo from github.com/dcuartielles/uno_q_dsi_displays (cloned to ~/uno_q_dsi_displays).
+# Installed by install-splash.sh.
+[Unit]
+Description=Dome bridge: vaporwave on the DSI screen until first touch
+After=systemd-user-sessions.service systemd-udev-settle.service
+ConditionPathExists=/dev/fb0
+
+[Service]
+Type=simple
+# The touch controller is polled, not interrupt-driven; give it a moment to appear.
+ExecStartPre=/bin/sh -c 'for i in $(seq 20); do grep -q ft5x06 /proc/bus/input/devices && exit 0; sleep 1; done; exit 0'
+ExecStart=/bin/sh /home/arduino/uno_q_dsi_displays/scripts/show-vaporwave.sh --rotate 0 --hold
+Nice=10
+Restart=no
+
+[Install]
+WantedBy=multi-user.target

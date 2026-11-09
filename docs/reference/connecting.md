@@ -25,6 +25,18 @@ The dome's HDMI input runs at **3840 × 2160**. Put the dome master in the middl
 2. Put your piece fullscreen on that display, centred, with black at the sides. The simplest way is OBS (below); some tools can do it themselves.
 3. Check the resolution again while connected. Some adapters quietly drop to 1080p.
 
+### The venue's test frame
+
+This is the frame the venue's capture console expects, shared by the Wisdome technicians: **3840 × 2160**,
+with the circle of the dome master in the middle. The circle is 2160 pixels across and touches the top and
+bottom edges. Everything outside it is not projected.
+
+![The Wisdome capture console test frame: a red checkerboard at 3840 × 2160, a white circle touching the top and bottom edges in the middle, two diagonals crossing at the centre, and the label Capture Console, W: 3840 × H: 2160](images/capture-console-3840x2160.jpg)
+
+[Download the full-size frame](images/capture-console-3840x2160.jpg) and use it to check your output before you come:
+put it fullscreen on your HDMI display (or as the OBS canvas), and lay your own picture over it.
+Your dome master's circle should sit exactly on the white circle, and the diagonals should cross at its centre.
+
 ### Sending the picture with OBS
 
 [OBS Studio](https://obsproject.com) (free, Windows, macOS, Linux) works with any tool.

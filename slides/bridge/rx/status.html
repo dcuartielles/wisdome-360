@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dome bridge</title>
+<style>
+  :root { color-scheme: dark; --bg:#0b0d10; --card:#14171c; --line:#252a31; --fg:#eef0f3; --mut:#8b919a;
+          --ok:#4fd27c; --warn:#ffb547; --bad:#ff5a5a; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--fg);
+               font: 18px/1.3 system-ui, "Segoe UI", sans-serif; user-select:none; -webkit-user-select:none; }
+  body { display:flex; flex-direction:column; padding:12px; gap:10px; }
+  header { display:flex; align-items:center; gap:12px; }
+  header h1 { font-size:22px; margin:0; letter-spacing:.04em; }
+  #overall { margin-left:auto; padding:6px 14px; border-radius:999px; font-weight:600; background:var(--line); }
+  .ok #overall, #overall.ok { background:var(--ok); color:#06210f; }
+  #overall.warn { background:var(--warn); color:#2b1a00; } #overall.bad { background:var(--bad); color:#2a0000; }
+  #rows { display:grid; grid-template-columns: repeat(2, 1fr); gap:10px; }
+  .row { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 12px;
+         display:flex; align-items:center; gap:10px; min-height:58px; }
+  .dot { width:16px; height:16px; border-radius:50%; background:var(--mut); flex:none; }
+  .dot.ok { background:var(--ok); } .dot.warn { background:var(--warn); } .dot.bad { background:var(--bad); }
+  .row b { font-size:14px; color:var(--mut); font-weight:600; letter-spacing:.06em; display:block; }
+  .row span { font-size:18px; }
+  #meters { flex:1; display:grid; grid-template-columns: repeat(6, 1fr); gap:10px; min-height:110px; }
+  .m { position:relative; background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .m i { position:absolute; left:0; right:0; bottom:0; height:0; background:linear-gradient(to top, var(--ok), var(--warn)); }
+  .m b { position:absolute; top:6px; left:0; right:0; text-align:center; color:var(--mut); font-size:15px; }
+  #buttons { display:grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap:10px; }
+  button { font:inherit; font-weight:600; color:var(--fg); background:var(--card); border:1px solid var(--line);
+           border-radius:12px; padding:16px 10px; min-height:64px; }
+  button.on { background:var(--warn); color:#2b1a00; border-color:var(--warn); }
+  #mute.on { background:var(--bad); color:#fff; border-color:var(--bad); }
+  #mute { font-size:22px; }
+  #raterow { display:flex; align-items:center; gap:10px; font-size:16px; color:var(--mut); }
+  #raterow input { font:inherit; font-size:18px; width:7.5em; padding:8px 10px; border-radius:10px; border:1px solid var(--line);
+                   background:var(--card); color:var(--fg); }
+  #raterow button { min-height:44px; padding:8px 18px; }
+  #ratemsg { font-size:14px; }
+  #foot { color:var(--mut); font-size:14px; display:flex; gap:16px; flex-wrap:wrap; }
+  #off { display:none; position:fixed; inset:0; background:rgba(0,0,0,.85); align-items:center; justify-content:center;
+         font-size:22px; color:var(--bad); }
+</style>
+</head>
+<body>
+<header><h1 id="name">DOME-BRIDGE</h1><div id="overall">…</div></header>
+<div id="rows">
+  <div class="row"><div class="dot" id="d-in"></div><div><b>SOUND FROM LAPTOP</b><span id="t-in">–</span></div></div>
+  <div class="row"><div class="dot" id="d-buf"></div><div><b>BUFFER · CLOCK MATCH</b><span id="t-buf">–</span></div></div>
+  <div class="row"><div class="dot" id="d-out"></div><div><b>OUTPUT (DANTE)</b><span id="t-out">–</span></div></div>
+  <div class="row"><div class="dot" id="d-sys"></div><div><b>BOARD</b><span id="t-sys">–</span></div></div>
+</div>
+<div id="meters"></div>
+<div id="buttons">
+  <button id="mute">MUTE</button>
+  <button id="ident">Ident</button>
+  <button id="tone">Tone</button>
+  <button id="reset">Reset</button>
+</div>
+<div id="raterow">
+  <span>DANTE SAMPLE RATE</span>
+  <input id="rate" inputmode="numeric" list="rates" aria-label="Dante sample rate in Hz">
+  <datalist id="rates"><option value="48000"><option value="96000"><option value="44100"><option value="88200"></datalist>
+  <span>Hz</span><button id="rateset">Set</button><span id="ratemsg"></span>
+</div>
+<div id="foot"><span id="f1"></span><span id="f2"></span></div>
+<div id="off">bridge program not answering</div>
+<script>
+const CH = ['L','R','C','LFE','Ls','Rs'];
+const $ = (id) => document.getElementById(id);
+const meters = $('meters');
+CH.forEach((n) => { const d = document.createElement('div'); d.className = 'm'; d.innerHTML = `<b>${n}</b><i></i>`; meters.append(d); });
+let last = null;
+const dot = (id, c) => { $(id).className = 'dot ' + c; return c; };
+const worst = (a) => a.includes('bad') ? 'bad' : a.includes('warn') ? 'warn' : 'ok';
+async function cmd(body) {
+  try { last = await (await fetch('/cmd', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).json(); draw(); } catch {}
+}
+$('mute').onclick = () => cmd({ action: 'mute', on: !(last && last.muted) });
+$('ident').onclick = () => cmd({ action: 'ident' });
+$('tone').onclick = () => cmd({ action: 'tone', on: !(last && last.tone), ch: -1 });
+$('reset').onclick = () => cmd({ action: 'reset' });
+// must match the venue's Dante network (Dante Controller shows it). Changing it reopens the Dante device.
+$('rateset').onclick = () => { const r = parseInt($('rate').value, 10); cmd({ action: 'rate', rate: r }); $('rate').blur(); };
+$('rate').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('rateset').click(); });
+function fmtUp(s) { const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return h ? `${h} h ${m} min` : `${m} min`; }
+function draw() {
+  const s = last; if (!s) return;
+  $('name').textContent = s.name;
+  const c = [];
+  const playing = s.state === 'playing';
+  c.push(dot('d-in', s.client ? (playing ? 'ok' : 'warn') : (s.tone || s.ident ? 'warn' : 'bad')));
+  $('t-in').textContent = s.client ? `${s.client} · ${s.state}` + (s.in_rate !== s.rate ? ` · ${s.in_rate} Hz` : '') : (s.tone ? 'no laptop · test tone' : 'no laptop connected');
+  const bufOk = Math.abs(s.fill_ms - s.target_ms) < s.target_ms * 0.5;
+  c.push(dot('d-buf', !playing ? 'warn' : (bufOk && Math.abs(s.ppm) < 250 ? 'ok' : 'warn')));
+  $('t-buf').textContent = `${s.fill_ms} ms · ${s.ppm > 0 ? '+' : ''}${s.ppm} ppm · underruns ${s.underruns}`;
+  c.push(dot('d-out', s.sink_error ? 'bad' : (s.muted ? 'warn' : 'ok')));
+  $('t-out').textContent = s.sink_error ? s.sink_error : `${s.device} · ${s.muted ? 'MUTED' : 'live'}`;
+  c.push(dot('d-sys', s.cpu_temp_c > 80 ? 'bad' : s.cpu_temp_c > 70 ? 'warn' : 'ok'));
+  $('t-sys').textContent = `${s.cpu_temp_c ?? '–'} °C · up ${fmtUp(s.uptime_s)}`;
+  const o = worst(c); $('overall').className = o;
+  $('overall').textContent = o === 'ok' ? 'ALL OK' : o === 'warn' ? 'CHECK' : 'PROBLEM';
+  [...meters.children].forEach((m, i) => m.querySelector('i').style.height = Math.min(100, Math.sqrt(s.levels[i] || 0) * 160) + '%');
+  $('mute').classList.toggle('on', s.muted); $('mute').textContent = s.muted ? 'MUTED · tap to unmute' : 'MUTE';
+  $('tone').classList.toggle('on', s.tone); $('ident').classList.toggle('on', s.ident);
+  $('f1').textContent = `blocks ${s.blocks} · drops ${s.drops} · gaps ${s.seq_gaps}`;
+  $('f2').textContent = `${s.rate} Hz · ${s.channels} ch · out ${s.sink}`;
+  if (document.activeElement !== $('rate')) $('rate').value = s.rate;
+  $('ratemsg').textContent = s.rate_msg || '';
+}
+async function poll() {
+  try { last = await (await fetch('/status', { cache: 'no-store' })).json(); $('off').style.display = 'none'; draw(); }
+  catch { $('off').style.display = 'flex'; }
+  setTimeout(poll, 250);
+}
+poll();
+</script>
+</body>
+</html>

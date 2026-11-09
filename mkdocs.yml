@@ -104,6 +104,7 @@ nav:
       - EX-10 Flight: examples/ex10-flight.ipynb
       - EX-11 Orbit (instrument): examples/ex11-orbit.md
       - EX-12 Orbit synth (AudioWorklet): examples/ex12-orbit-synth.md
+      - EX-13 Simple HDMI + Dante example: examples/ex13-simple-hdmi-dante.md
   - Problems: problems.md
   - MaU course 2026:
       - course/index.md

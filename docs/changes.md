@@ -10,6 +10,13 @@ Every change to this site is listed here, newest first, grouped by release. If s
 
 Changes since v0.0.2, *venue*. They are already on this site.
 
+### 2026-11-09 (evening)
+
+- **The venue's HDMI test frame**, from the Wisdome technicians: 3840 × 2160 with the dome circle in the middle. Check your output against it before you come. See [Connecting a live piece](reference/connecting.md#the-venues-test-frame).
+
+- **New example: EX-13 Simple HDMI + Dante example.** A small version of the live slides used in the lecture, with five commented demo slides (test image, title, a comet with 5.1 sound, a carousel of pictures and video, a dome film) and step-by-step instructions for testing in the browser, the picture over HDMI and the sound over Dante. See [EX-13](examples/ex13-simple-hdmi-dante.md).
+- **The lecture's live slides are in the repository** (`slides/` folder), without the pictures and films that belong to other people; `slides/THIRD-PARTY-MEDIA.md` lists them and where to get them.
+
 ### 2026-11-09
 
 - **EX-05 TouchDesigner: a ready-made network.** A script that builds the whole dome network in TouchDesigner for you, and the saved `.toe`, with a screenshot. See [EX-05](examples/ex05-touchdesigner.md).

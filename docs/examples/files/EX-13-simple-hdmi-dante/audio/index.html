@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dome audio</title>
+<style>
+  :root { color-scheme: dark; --bg: #0d0f12; --fg: #e8eaed; --mut: #8a8f98; --acc: #ffb547; --ok: #5be38b; --line: #23272e; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 system-ui, "Segoe UI", sans-serif; padding: 24px; max-width: 760px; }
+  h1 { font-size: 20px; margin: 0 0 4px; } p { color: var(--mut); margin: 4px 0 16px; }
+  button, select, input { font: inherit; background: #1b1f25; color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; }
+  button.primary { background: var(--acc); color: #111; border: 0; font-weight: 600; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 12px 0; }
+  #meters { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-top: 18px; }
+  .m { background: #15181d; border: 1px solid var(--line); border-radius: 8px; height: 160px; position: relative; overflow: hidden; }
+  .m i { position: absolute; left: 0; right: 0; bottom: 0; background: linear-gradient(to top, var(--ok), var(--acc)); height: 0; }
+  .m b { position: absolute; top: 6px; left: 0; right: 0; text-align: center; font-size: 13px; color: var(--mut); }
+  #info { font: 13px ui-monospace, Consolas, monospace; color: var(--mut); white-space: pre-wrap; margin-top: 16px; }
+  .warn { color: var(--acc); }
+</style>
+</head>
+<body>
+<h1>Dome audio · 5.1 out</h1>
+<p>Keep this tab open in its own window. It plays the sound half of every slide, 6 channels in the order L R C LFE Ls Rs. Two ways out: the <b>UNO Q bridge</b> (sends the 6 channels over the network to the bridge, which puts them on Dante), or <b>this computer's output</b>. For the Dante Virtual Soundcard on Windows, set its playback device to <b>5.1, 48 kHz</b> in Sound settings, or Chrome sends stereo.</p>
+<div class="row">
+  <button class="primary" id="start">Start sound</button>
+  <select id="dev"><option value="">System default output</option></select>
+  <button id="ident" disabled>Channel ident</button>
+</div>
+<div class="row">
+  <select id="mode">
+    <option value="device">Out: this computer only</option>
+    <option value="bridge">Out: UNO Q bridge (Dante)</option>
+    <option value="both">Out: bridge + this computer</option>
+  </select>
+  <input id="bhost" size="18" placeholder="bridge address" title="UNO Q address, e.g. 192.168.0.2 or dome-bridge.local">
+  <span id="bstate" style="color:var(--mut)"></span>
+</div>
+<div id="meters"></div>
+<div id="info"></div>
+<script type="module">
+import { connect } from '../lib/bus.js';
+import { loadSlides } from '../slides/index.js';
+import { AudioHost } from '../lib/audiohost.js';
+import { CH, playIdent } from '../lib/audio51.js';
+import { BridgeOut } from '../lib/bridgeout.js';
+
+const bus = connect('audio');
+const slides = await loadSlides();
+const host = new AudioHost(bus, slides);
+const $ = (id) => document.getElementById(id);
+const meters = $('meters');
+CH.forEach((n) => { const d = document.createElement('div'); d.className = 'm'; d.innerHTML = `<b>${n}</b><i></i>`; meters.append(d); });
+
+async function listDevices() {
+  try { (await navigator.mediaDevices.getUserMedia({ audio: true })).getTracks().forEach((t) => t.stop()); } catch {}
+  const devs = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audiooutput');
+  const sel = $('dev'), saved = localStorage.getItem('dome.audio.device') || '';
+  sel.innerHTML = '<option value="">System default output</option>' + devs.filter((d) => d.deviceId !== 'default').map((d) => `<option value="${d.deviceId}">${d.label || d.deviceId}</option>`).join('');
+  // match by name, not id, so the same setting works on both machines
+  const byName = devs.find((d) => d.label && d.label === localStorage.getItem('dome.audio.label'));
+  sel.value = byName ? byName.deviceId : (devs.some((d) => d.deviceId === saved) ? saved : '');
+}
+await listDevices();
+
+// --- output: this computer / UNO Q bridge / both -----------------------------------------------
+const qs = new URLSearchParams(location.search);
+$('mode').value = qs.get('mode') || localStorage.getItem('dome.audio.mode') || 'device';
+$('bhost').value = qs.get('bridge') || localStorage.getItem('dome.bridge.host') || '192.168.0.2';
+let bridge = null;
+async function applyMode() {
+  const mode = $('mode').value, addr = $('bhost').value.trim();
+  localStorage.setItem('dome.audio.mode', mode); localStorage.setItem('dome.bridge.host', addr);
+  if (!host.ctx) return;
+  host.engine.setMonitor(mode !== 'bridge');
+  if (mode === 'device') { bridge?.stop(); return; }
+  const [h, p] = addr.split(':');
+  if (!bridge) { bridge = new BridgeOut(host.ctx, host.engine.delay); await bridge.start(h, Number(p) || 9300); }
+  else if (!bridge.wanted) await bridge.start(h, Number(p) || 9300);
+  else bridge.setHost(h, Number(p) || 9300);
+}
+$('mode').onchange = applyMode;
+$('bhost').onchange = applyMode;
+setInterval(() => {   // bridge status to the presenter
+  if (bridge?.wanted) bus.cmd({ type: 'stats', role: 'bridge', ...bridge.status() });
+}, 1000);
+// started by the desktop launcher: start at once (Chrome runs with autoplay allowed)
+if (new URLSearchParams(location.search).has('autostart')) setTimeout(() => $('start').click(), 300);
+
+$('start').onclick = async () => {
+  await host.start($('dev').value || undefined);
+  await applyMode();
+  $('start').textContent = 'Running'; $('start').disabled = true; $('ident').disabled = false;
+  setInterval(draw, 60);
+};
+$('dev').onchange = async (e) => {
+  const opt = e.target.selectedOptions[0];
+  localStorage.setItem('dome.audio.device', e.target.value);
+  localStorage.setItem('dome.audio.label', opt?.textContent || '');
+  if (host.ctx) await host.setSink(e.target.value);
+};
+$('ident').onclick = () => { const g = host.engine.group(); playIdent(g, host.ctx.currentTime + 0.1); setTimeout(() => g.dispose(), 7000); };
+
+function draw() {
+  const lv = host.engine.levels();
+  [...meters.children].forEach((m, i) => { m.querySelector('i').style.height = Math.min(100, Math.sqrt(lv[i]) * 160) + '%'; });
+  const c = host.ctx, d = c.destination;
+  $('info').innerHTML = `device channels: ${d.maxChannelCount} → ${host.engine.discrete ? '6 discrete' : '<span class="warn">downmix to ' + d.channelCount + ' (not 5.1!)</span>'}\n` +
+    `sample rate: ${c.sampleRate} Hz   base latency: ${(c.baseLatency * 1000).toFixed(1)} ms   output latency: ${((c.outputLatency || 0) * 1000).toFixed(1)} ms\n` +
+    `audio delay (set on presenter): ${bus.state?.delayMs ?? 0} ms   slide: ${slides[bus.state?.slide]?.title ?? '-'}\n` +
+    `server: ${bus.connected ? 'connected' : '<span class="warn">offline</span>'}` + bridgeLine();
+}
+function bridgeLine() {
+  if (!bridge?.wanted) { $('bstate').textContent = ''; return ''; }
+  const b = bridge.status();
+  const ok = b.link === 'connected' && b.state === 'playing';
+  $('bstate').innerHTML = ok ? '● bridge playing' : `<span class="warn">● bridge ${b.link === 'connected' ? (b.state ?? '…') : b.link}</span>`;
+  return `\nbridge: ${b.link} → ${b.host}` + (b.state ? `   ${b.state}   buffer ${b.fill_ms} ms   clock ${b.ppm > 0 ? '+' : ''}${b.ppm} ppm   underruns ${b.underruns}` : '') +
+    `   sent ${b.sent}` + (b.dropped ? `   <span class="warn">dropped ${b.dropped}</span>` : '') +
+    (b.muted ? '   <span class="warn">MUTED on the bridge</span>' : '') + (b.sink_error ? `\n<span class="warn">bridge output: ${b.sink_error}</span>` : '');
+}
+</script>
+</body>
+</html>

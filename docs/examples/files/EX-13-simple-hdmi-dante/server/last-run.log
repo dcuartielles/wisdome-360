@@ -1,0 +1,9 @@
+start 2026-11-09T19:31:37.528Z  node v22.22.0  argv --port 8399  cwd /tmp/claude-0/web
+
+Dome slides server on port 8399
+  presenter  http://localhost:8399/presenter/
+  video      http://localhost:8399/video/        (OBS Browser Source, 2048 x 2048)
+  audio      http://localhost:8399/audio/        (Chrome tab → Dante / 5.1 device)
+  rehearse   http://localhost:8399/video/?audio=1&view=inside   (one tab, picture + sound)
+  on the LAN http://192.0.2.2:8399/presenter/
+

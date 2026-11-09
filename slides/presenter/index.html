@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dome presenter</title>
+<link rel="stylesheet" href="./presenter.css">
+</head>
+<body>
+<header>
+  <div class="now"><span id="idx">–</span><h1 id="title">Connecting…</h1></div>
+  <div class="stat" id="clock">00:00</div>
+  <div class="stat" id="vstat">video –</div>
+  <div class="stat" id="astat">audio –</div>
+  <div class="stat" id="bstat" style="display:none">bridge –</div>
+  <div class="stat" id="conn">●</div>
+</header>
+<main>
+  <section class="left">
+    <div class="pv"><iframe id="pv" title="dome preview"></iframe><div id="pvclick" title="click: next picture · shift-click: previous"></div></div>
+    <div class="toggles">
+      <button data-view="master" class="on">Master</button>
+      <button data-view="inside">Inside view</button>
+      <span class="sep"></span>
+      <button data-global="guides" title="G">Guides</button>
+      <button data-global="pip" title="P">Show the file</button>
+      <button data-global="vscale" title="V">Venue scale</button>
+      <button data-global="mute" title="M">Mute</button>
+      <button data-global="blackout" class="danger" title="B">Blackout</button>
+    </div>
+    <div class="meters" id="meters"></div>
+    <label class="delay">Audio delay <input type="range" id="delay" min="0" max="400" step="5"> <output id="delayv">0 ms</output></label>
+    <h2>Projection <span class="hint">· the file vs the dome, live</span></h2>
+    <div class="proj" id="proj">
+      <div class="presets" id="presets"></div>
+      <div class="pgrid">
+        <fieldset><legend>The file <i>how we render</i></legend>
+          <div class="pctl" data-k="fov"><label><span>Field of view</span><output></output></label><input type="range" min="120" max="220" step="1"></div>
+          <div class="pctl" data-k="tilt"><label><span>Made for a tilt of</span><output></output></label><input type="range" min="0" max="45" step="1"></div>
+        </fieldset>
+        <fieldset><legend>The dome <i>how the venue projects it</i></legend>
+          <div class="pctl" data-k="vfov"><label><span>Spreads the file over</span><output></output></label><input type="range" min="120" max="220" step="1"></div>
+          <div class="pctl" data-k="vtilt"><label><span>Real tilt</span><output></output></label><input type="range" min="0" max="45" step="1"></div>
+          <div class="pctl" data-k="opening"><label><span>Screen opening</span><output></output></label><input type="range" min="120" max="220" step="1"></div>
+        </fieldset>
+      </div>
+      <label class="plink"><input type="checkbox" id="plink"> The file follows the dome (render to match)</label>
+      <div class="psum" id="psum"></div>
+    </div>
+  </section>
+  <section class="mid">
+    <div class="nav">
+      <button id="prev">◀ Prev</button>
+      <button id="restart" title="restart this slide">↺</button>
+      <button id="next" class="primary">Next ▶</button>
+    </div>
+    <div class="nextup" id="nextup"></div>
+    <h2>Controls</h2>
+    <div id="controls" class="controls"></div>
+    <h2>Notes</h2>
+    <div id="notes" class="notes"></div>
+  </section>
+  <section class="right">
+    <ol id="list"></ol>
+    <button id="quit" class="quit" title="stop the slide server">Shut down server</button>
+    <div class="help">← → / PageUp PageDown · B blackout · G guides · V venue scale · P show the file · M mute · R restart</div>
+  </section>
+</main>
+<script type="module" src="./presenter.js"></script>
+</body>
+</html>

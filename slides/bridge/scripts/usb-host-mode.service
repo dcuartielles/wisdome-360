@@ -1,0 +1,28 @@
+# Put the UNO Q's USB-C port into host mode at boot, so the hub (and its Ethernet) works.
+#
+# Why: with a DSI panel enabled on the Media Carrier, the ANX7625 USB-C/DisplayPort bridge
+# loses the SoC's only DSI controller and fails to probe ("fail to get internal panel").
+# It is also what tells the USB controller (dwc3) to switch roles, so without it the port
+# stays in device mode: adb works, a hub doesn't. Forcing host mode brings the hub back,
+# on USB 2 only (the USB 3 lanes go through the ANX7625 too) - plenty for Dante + the bridge.
+#
+# Side effect: adb over USB-C stops working while this is active. Recovery is SSH over Wi-Fi,
+# or: sudo systemctl disable usb-host-mode && sudo reboot
+#
+# Install: sudo install -m 644 ~/bridge/scripts/usb-host-mode.service /etc/systemd/system/ \
+#          && sudo systemctl daemon-reload && sudo systemctl enable --now usb-host-mode
+[Unit]
+Description=UNO Q: force USB-C into host mode (DSI panel takes the ANX7625's DSI)
+After=sys-kernel-debug.mount
+Requires=sys-kernel-debug.mount
+Before=network-pre.target
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c 'for i in $(seq 30); do [ -w /sys/kernel/debug/usb/4e00000.usb/mode ] && break; sleep 1; done; echo host > /sys/kernel/debug/usb/4e00000.usb/mode'
+ExecStop=/bin/sh -c 'echo device > /sys/kernel/debug/usb/4e00000.usb/mode'
+
+[Install]
+WantedBy=multi-user.target

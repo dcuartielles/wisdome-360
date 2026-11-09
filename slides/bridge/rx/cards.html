@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DOME-BRIDGE</title>
+<style>
+/* Three tiles in the Metro way: the board on the left, the two connections stacked on the right.
+   Flat colour means state: green = working, amber = a warning (stays until you touch the tile),
+   red = not working. Built for the 800 x 480 DSI screen; works in any browser too. */
+:root {
+  --ok: #2b9a48; --warn: #f0a30a; --bad: #d9291c; --off: #3b4250; --ink: #ffffff; --ink-warn: #1d1606;
+  --ui: "Segoe UI", "Selawik", "Open Sans", "DejaVu Sans", "Noto Sans", Arial, sans-serif;
+  --mono: "DejaVu Sans Mono", "Noto Sans Mono", Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; background: #0b0d10; color: var(--ink); font-family: var(--ui); overflow: hidden;
+  -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; cursor: default; }
+.grid { position: absolute; inset: 0; padding: 8px; display: grid; gap: 8px;
+  grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.tile { position: relative; overflow: hidden; padding: 14px 16px; display: flex; flex-direction: column;
+  background: var(--off); transition: background-color .45s ease, color .45s ease; }
+.tile.ok { background: var(--ok); } .tile.warn { background: var(--warn); color: var(--ink-warn); } .tile.bad { background: var(--bad); }
+.tile:active { transform: scale(.985); }
+#board { grid-row: 1 / 3; padding: 16px 18px; }
+#bg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; opacity: .55; }
+.tile > *:not(canvas) { position: relative; }
+.label { font-size: 13px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; opacity: .85; }
+.state { font-size: 40px; font-weight: 300; line-height: 1.05; margin-top: 4px; letter-spacing: -.01em; }
+#board .state { font-size: 54px; margin-top: 8px; }
+.why { font-size: 15px; margin-top: 6px; min-height: 2.6em; opacity: .95; }
+.pair { display: grid; grid-template-columns: 54px 1fr; row-gap: 2px; margin-top: auto; align-items: baseline; }
+.pair .k { font-size: 13px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; opacity: .8; }
+.pair .v { font-family: var(--mono); font-size: 21px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pair .sub { grid-column: 2; font-size: 12.5px; opacity: .85; margin-top: -1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.note { position: absolute; top: 12px; right: 14px; font-size: 12px; opacity: .8; text-align: right; }
+.facts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; margin-top: 14px; font-size: 14px; }
+.facts b { display: block; font-family: var(--mono); font-size: 20px; font-weight: 400; }
+.facts span { opacity: .85; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+.meters { display: flex; gap: 6px; align-items: flex-end; height: 44px; margin-top: 14px; }
+.meters div { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
+.meters i { display: block; width: 100%; background: currentColor; opacity: .9; height: 2%; transition: height .12s linear; }
+.meters small { font-size: 10px; margin-top: 2px; opacity: .85; }
+.buttons { display: flex; gap: 8px; margin-top: auto; padding-top: 12px; }
+.buttons button { flex: 1; font: 600 14px var(--ui); letter-spacing: .1em; text-transform: uppercase; color: inherit;
+  background: rgba(255,255,255,.12); border: 2px solid currentColor; padding: 10px 0; cursor: pointer; }
+.tile.warn .buttons button { background: rgba(0,0,0,.06); }
+.buttons button.on { background: currentColor; }
+.buttons button.on span { filter: invert(1); mix-blend-mode: difference; }
+.buttons a { flex: 0 0 44px; display: grid; place-items: center; color: inherit; text-decoration: none; border: 2px solid currentColor; font-size: 20px; }
+#offline { position: absolute; inset: 0; display: none; place-items: center; background: rgba(11,13,16,.88); font-size: 22px; text-align: center; padding: 20px; }
+@media (max-width: 620px) { .grid { grid-template-columns: 1fr; grid-template-rows: auto auto auto; overflow: auto; }
+  #board { grid-row: auto; min-height: 420px; } .tile { min-height: 220px; } html, body { overflow: auto; } }
+@media (prefers-reduced-motion: reduce) { .tile, .meters i { transition: none; } }
+</style>
+</head>
+<body>
+<div class="grid">
+  <section class="tile" id="board">
+    <canvas id="bg"></canvas>
+    <div class="label" id="name">DOME-BRIDGE</div>
+    <div class="state" id="bstate">starting</div>
+    <div class="why" id="bwhy">waiting for the receiver</div>
+    <div class="facts">
+      <div><span>sound buffer</span><b id="f-buf">–</b></div>
+      <div><span>clock match</span><b id="f-ppm">–</b></div>
+      <div><span>dropouts</span><b id="f-und">–</b></div>
+      <div><span>Dante</span><b id="f-rate">–</b></div>
+      <div><span>board</span><b id="f-cpu">–</b></div>
+      <div><span>running</span><b id="f-up">–</b></div>
+    </div>
+    <div class="meters" id="meters"></div>
+    <div class="buttons">
+      <button id="tone"><span>Tone</span></button>
+      <button id="ident"><span>Ident</span></button>
+      <button id="mute"><span>Mute</span></button>
+      <a href="/classic" title="More: sample rate, reset">⋯</a>
+    </div>
+  </section>
+
+  <section class="tile" id="pc">
+    <div class="label">Laptop · sound in</div>
+    <div class="note" id="pcnote"></div>
+    <div class="state" id="pcstate">–</div>
+    <div class="why" id="pcwhy"></div>
+    <div class="pair">
+      <span class="k">me</span><span class="v" id="pcme">–</span>
+      <span class="k">them</span><span class="v" id="pcthem">–</span>
+    </div>
+  </section>
+
+  <section class="tile" id="dante">
+    <div class="label">Dante · sound out</div>
+    <div class="note" id="dnote"></div>
+    <div class="state" id="dstate">–</div>
+    <div class="why" id="dwhy"></div>
+    <div class="pair">
+      <span class="k">me</span><span class="v" id="dme">–</span>
+      <span class="k">them</span><span class="v" id="dthem">–</span>
+      <span class="sub" id="dsub"></span>
+    </div>
+  </section>
+</div>
+<div id="offline"><div><b>The receiver is not answering.</b><br><span style="font-size:16px;opacity:.85">Start it on the board:<br><code>sudo python3 ~/bridge/rx/domebridge_rx.py --device dome</code></span></div></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const CH = ['L', 'R', 'C', 'LFE', 'Ls', 'Rs'];
+$('meters').innerHTML = CH.map((c) => `<div><i></i><small>${c}</small></div>`).join('');
+
+// ---- what each connection card remembers until it is touched -------------------------------
+const latch = { pc: [], dante: [] };
+const seen = { und: null, gaps: null, drops: null, sinkErr: null, clock: null };
+for (const id of ['pc', 'dante']) $(id).addEventListener('pointerdown', () => { latch[id] = []; draw(); });
+const addLatch = (id, msg) => { if (!latch[id].includes(msg)) latch[id].push(msg); if (latch[id].length > 3) latch[id].shift(); };
+
+// ---- the board card: green, then amber, then red if trouble lasts ---------------------------
+const TO_RED_S = 20, TO_GREEN_S = 3;
+let badSince = null, goodSince = Date.now(), boardLevel = 'ok';
+
+let last = null, failCount = 0;
+async function poll() {
+  try {
+    const r = await fetch('/status', { cache: 'no-store' });
+    last = await r.json(); failCount = 0;
+    $('offline').style.display = 'none';
+  } catch { failCount++; if (failCount > 2) { last = null; $('offline').style.display = 'grid'; } }
+  draw();
+}
+setInterval(poll, 500); poll();
+
+async function cmd(body) {
+  try { last = await (await fetch('/cmd', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).json(); draw(); } catch {}
+}
+$('tone').onclick = (e) => { e.stopPropagation(); cmd({ action: 'tone', on: !(last && last.tone), ch: -1 }); };
+$('ident').onclick = (e) => { e.stopPropagation(); cmd({ action: 'ident' }); };
+$('mute').onclick = (e) => { e.stopPropagation(); cmd({ action: 'mute', on: !(last && last.muted) }); };
+
+function fmtTime(s) { if (s == null) return '–'; if (s < 90) return s + ' s'; if (s < 5400) return Math.round(s / 60) + ' min'; return (s / 3600).toFixed(1) + ' h'; }
+function setTile(el, level) { el.classList.remove('ok', 'warn', 'bad'); if (level) el.classList.add(level); }
+
+function laptopCard(s) {
+  const n = s.net || {};
+  const meIp = s.client_local ? s.client_local.replace(/^::ffff:/, '') : `${n.laptop_ip || '192.168.0.2'}:${s.ws_port || 9300}`;
+  $('pcme').textContent = meIp;
+  // new problems since the last poll go on the card until it is touched
+  if (seen.und != null && s.underruns > seen.und) addLatch('pc', `${s.underruns - seen.und} dropout${s.underruns - seen.und > 1 ? 's' : ''}`);
+  if (seen.gaps != null && s.seq_gaps > seen.gaps) addLatch('pc', 'blocks lost on the way');
+  if (seen.drops != null && s.drops > seen.drops) addLatch('pc', 'backlog trimmed');
+  seen.und = s.underruns; seen.gaps = s.seq_gaps; seen.drops = s.drops;
+  let level, state, why;
+  if (!s.client) {
+    level = 'bad'; state = 'not connected'; why = 'No laptop. Audio page → Out: UNO Q bridge, ' + (n.laptop_ip || '192.168.0.2');
+    $('pcthem').textContent = '–';
+  } else {
+    $('pcthem').textContent = `${s.client.replace(/^::ffff:/, '')}:${s.client_port ?? ''}`;
+    if (s.since_rx_s == null || s.since_rx_s > 2) { level = 'bad'; state = 'connected, silent'; why = 'The laptop is connected but sends no sound. Is the audio page running?'; }
+    else { level = 'ok'; state = 'receiving'; why = `${s.in_rate / 1000} kHz · 6 channels · connected ${fmtTime(s.client_since_s)}`; }
+  }
+  if (level === 'ok' && latch.pc.length) { level = 'warn'; why = latch.pc.join(' · '); }
+  $('pcstate').textContent = state; $('pcwhy').textContent = why;
+  $('pcnote').textContent = latch.pc.length ? 'touch to clear' : '';
+  setTile($('pc'), level);
+  return { level, why: level === 'ok' ? '' : `Laptop: ${state}` };
+}
+
+function danteCard(s) {
+  const n = s.net || {};
+  const dante = s.device === 'dome' && s.sink === 'aplay';
+  if (!dante) {
+    setTile($('dante'), null);
+    $('dstate').textContent = 'not in use'; $('dwhy').textContent = `Playing to ${s.sink === 'null' ? 'nothing (test)' : 'ALSA ' + s.device}. Start with --device dome for Dante.`;
+    $('dme').textContent = n.dante_ip || '–'; $('dthem').textContent = '–'; $('dsub').textContent = ''; $('dnote').textContent = '';
+    return { level: 'ok', why: '' };
+  }
+  $('dme').textContent = n.dante_ip ? `${n.dante_ip}  (${s.channels} ch)` : 'no Dante address';
+  const peers = (n.peers || []).map((p) => p.ip);
+  if (n.leader) { $('dthem').textContent = `${n.leader}:319`; $('dsub').textContent = 'clock leader (PTP 319/320)' + (peers.length ? ' · also ' + peers.filter((p) => p !== n.leader).slice(0, 2).join(', ') : ''); }
+  else if (peers.length) { $('dthem').textContent = peers[0] + (peers.length > 1 ? ` +${peers.length - 1}` : ''); $('dsub').textContent = 'Dante devices this board talks to' + (peers.length > 1 ? ': ' + peers.slice(1, 4).join(', ') : ''); }
+  else { $('dthem').textContent = '–'; $('dsub').textContent = 'no Dante devices seen yet'; }
+  if (s.sink_error && s.sink_error !== seen.sinkErr) addLatch('dante', 'sound device error');
+  seen.sinkErr = s.sink_error;
+  if (seen.clock === 'following' && n.clock && n.clock !== 'following') addLatch('dante', 'clock lock was lost');
+  seen.clock = n.clock;
+  let level = 'ok', state = 'sending', why = `clock ${n.clock || '?'} · ${s.rate / 1000} kHz · ${s.muted ? 'MUTED' : 'channels 01–06'}`;
+  if (!n.dante_ip) { level = 'bad'; state = 'no network'; why = 'No Dante address. Is our switch on their Dante network? setup-venue-net.sh'; }
+  else if (!n.bind_ok) { level = 'bad'; state = 'wrong address'; why = `Inferno is bound to ${n.dante_bind}, which this board no longer has. Run start-dante.sh again.`; }
+  else if (!n.statime) { level = 'bad'; state = 'no clock'; why = 'Statime is not running: sudo bash ~/bridge/dante/start-dante.sh'; }
+  else if (!n.inferno) { level = 'bad'; state = 'not on Dante'; why = 'Inferno has not opened its ports (8700/8800). Restart the receiver.'; }
+  else if (s.sink_error) { level = 'bad'; state = 'sound error'; why = String(s.sink_error).slice(0, 90); }
+  else if (n.clock && n.clock !== 'following') { level = 'warn'; state = 'locking'; why = `Clock is ${n.clock}: waiting for their clock leader.`; }
+  if (level === 'ok' && latch.dante.length) { level = 'warn'; why = latch.dante.join(' · '); }
+  $('dstate').textContent = state; $('dwhy').textContent = why;
+  $('dnote').textContent = latch.dante.length ? 'touch to clear' : '';
+  setTile($('dante'), level);
+  return { level, why: level === 'ok' ? '' : `Dante: ${state}` };
+}
+
+function draw() {
+  if (!last) {
+    for (const id of ['pc', 'dante']) setTile($(id), 'bad');
+    setTile($('board'), 'bad'); boardLevel = 'bad';
+    $('bstate').textContent = 'no receiver'; $('bwhy').textContent = 'The status page cannot reach domebridge_rx.';
+    return;
+  }
+  const s = last;
+  $('name').textContent = s.name || 'DOME-BRIDGE';
+  const a = laptopCard(s), b = danteCard(s);
+  // the board: any red or amber condition right now counts as trouble; it turns amber at once,
+  // red if it lasts TO_RED_S seconds, and green again after TO_GREEN_S good seconds
+  const now = Date.now();
+  const trouble = [a, b].filter((x) => x.level !== 'ok');
+  if (trouble.length) { badSince ??= now; goodSince = null; }
+  else { goodSince ??= now; if (now - goodSince > TO_GREEN_S * 1000) badSince = null; }
+  if (badSince == null) boardLevel = 'ok';
+  else boardLevel = now - badSince > TO_RED_S * 1000 ? 'bad' : 'warn';
+  setTile($('board'), boardLevel);
+  $('bstate').textContent = boardLevel === 'ok' ? 'all good' : boardLevel === 'warn' ? 'check' : 'problem';
+  $('bwhy').textContent = trouble.length ? trouble.map((x) => x.why).join(' · ') + (boardLevel === 'bad' ? ` (for ${Math.round((now - badSince) / 1000)} s)` : '')
+    : `Laptop → board → Dante: sound is flowing.${s.tone ? ' Test tone on.' : ''}${s.muted ? ' MUTED.' : ''}`;
+  $('f-buf').textContent = s.client ? `${Math.round(s.fill_ms)} ms` : '–';
+  $('f-ppm').textContent = s.client ? `${s.ppm > 0 ? '+' : ''}${s.ppm} ppm` : '–';
+  $('f-und').textContent = s.underruns ?? '–';
+  $('f-rate').textContent = `${s.rate / 1000} kHz`;
+  $('f-cpu').textContent = s.cpu_temp_c != null ? `${Math.round(s.cpu_temp_c)} °C` : '–';
+  $('f-up').textContent = fmtTime(s.uptime_s);
+  const lv = s.levels || [];
+  [...$('meters').children].forEach((m, i) => { m.querySelector('i').style.height = Math.max(2, Math.min(100, Math.sqrt(lv[i] || 0) * 220)) + '%'; });
+  $('tone').classList.toggle('on', !!s.tone); $('mute').classList.toggle('on', !!s.muted); $('ident').classList.toggle('on', !!s.ident);
+}
+
+// ---- the board card's background: slow rings, like a dome master seen from below ------------
+const cv = $('bg'), g = cv.getContext('2d');
+let t0 = performance.now();
+function frame(now) {
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  g.clearRect(0, 0, w, h);
+  const t = (now - t0) / 1000, speed = boardLevel === 'ok' ? 0.25 : boardLevel === 'warn' ? 0.6 : 1.2;
+  const cx = w * 0.78, cy = h * 1.05, R = Math.hypot(w, h);
+  g.lineWidth = 2;
+  for (let k = 0; k < 14; k++) {
+    const r = ((((k / 14 + Math.max(0, t) * speed * 0.05) % 1) + 1) % 1) * R;
+    g.strokeStyle = `rgba(255,255,255,${0.16 * (1 - r / R)})`;
+    g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke();
+  }
+  setTimeout(() => requestAnimationFrame(frame), 66);   // ~15 fps: light on the board
+}
+if (!matchMedia('(prefers-reduced-motion: reduce)').matches) requestAnimationFrame(frame);
+</script>
+</body>
+</html>

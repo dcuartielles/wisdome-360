@@ -1,0 +1,78 @@
+:root {
+  color-scheme: dark;
+  --bg: #0c0d10; --panel: #14161b; --panel2: #1b1e25; --line: #262a32;
+  --fg: #eceef1; --mut: #8b919b; --acc: #ffb547; --acc2: #6cc6ff; --ok: #5be38b; --bad: #ff5d5d;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 14px/1.45 system-ui, "Segoe UI", "Helvetica Neue", sans-serif; }
+header { display: flex; gap: 18px; align-items: center; padding: 10px 18px; border-bottom: 1px solid var(--line); background: #0f1014; }
+.now { display: flex; gap: 12px; align-items: baseline; flex: 1; min-width: 0; }
+#idx { color: var(--acc); font: 600 15px ui-monospace, Consolas, monospace; }
+h1 { margin: 0; font-size: 19px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat { font: 13px ui-monospace, Consolas, monospace; color: var(--mut); white-space: nowrap; }
+.stat.warn { color: var(--acc); } .stat.bad { color: var(--bad); }
+#conn { color: var(--bad); } #conn.ok { color: var(--ok); }
+main { display: grid; grid-template-columns: minmax(380px, 46vh) minmax(360px, 1fr) 280px; gap: 0; height: calc(100% - 50px); }
+section { padding: 16px 18px; overflow: auto; border-right: 1px solid var(--line); }
+section.right { border-right: 0; background: #0f1014; }
+.pv { aspect-ratio: 1; background: #000; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); }
+.pv { position: relative; }
+#pvclick { position: absolute; inset: 0; cursor: pointer; display: none; }
+#pvclick.on { display: block; }
+.pv iframe { width: 100%; height: 100%; border: 0; display: block; }
+.toggles { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0 14px; align-items: center; }
+.sep { width: 8px; }
+button { font: inherit; color: var(--fg); background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; cursor: pointer; }
+button:hover { border-color: #3a404b; }
+button.on { background: #2d2614; border-color: var(--acc); color: var(--acc); }
+button.danger.on { background: #3a1414; border-color: var(--bad); color: var(--bad); }
+button.primary { background: var(--acc); color: #141414; border-color: var(--acc); font-weight: 650; }
+.nav { display: flex; gap: 8px; }
+.nav button { padding: 12px 18px; font-size: 16px; }
+.nav #next { flex: 1; }
+.nextup { color: var(--mut); margin: 8px 0 4px; font-size: 13px; }
+h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--mut); margin: 22px 0 8px; font-weight: 600; }
+.controls { display: grid; gap: 10px; }
+.ctl { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.ctl label { display: flex; justify-content: space-between; color: var(--mut); font-size: 13px; margin-bottom: 6px; }
+.ctl label output { color: var(--fg); font-family: ui-monospace, Consolas, monospace; }
+.ctl input[type=range] { width: 100%; accent-color: var(--acc); }
+.ctl .opts { display: flex; flex-wrap: wrap; gap: 6px; }
+.ctl.btn button { width: 100%; padding: 10px; }
+.ctl .hint { color: var(--mut); font-size: 12px; margin-top: 4px; }
+.notes { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 15px; line-height: 1.55; }
+.notes p { margin: 0 0 .7em; } .notes ul { margin: 0 0 .7em; padding-left: 1.2em; } .notes b { color: var(--acc); }
+#list { list-style: none; margin: 0; padding: 0; counter-reset: s; }
+#list li { padding: 7px 10px; border-radius: 8px; cursor: pointer; display: flex; gap: 10px; color: #c6cad1; }
+#list li::before { counter-increment: s; content: counter(s, decimal-leading-zero); color: var(--mut); font: 12px ui-monospace, monospace; padding-top: 2px; }
+#list li:hover { background: var(--panel); }
+#list li.cur { background: #2d2614; color: var(--acc); }
+#list li.act { cursor: default; color: var(--acc2); font-size: 11px; text-transform: uppercase; letter-spacing: .1em; padding-top: 16px; }
+#list li.act::before { content: none; }
+.help { color: var(--mut); font-size: 12px; margin-top: 18px; line-height: 1.7; }
+.meters { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.meters div { height: 44px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; position: relative; overflow: hidden; }
+.meters i { position: absolute; left: 0; right: 0; bottom: 0; background: linear-gradient(to top, var(--ok), var(--acc)); height: 0; transition: height .1s; }
+.meters b { position: absolute; inset: 0; display: grid; place-items: center; font-size: 11px; color: var(--fg); font-weight: 600; mix-blend-mode: difference; }
+.delay { display: flex; align-items: center; gap: 10px; margin-top: 10px; color: var(--mut); font-size: 13px; }
+.delay input { flex: 1; accent-color: var(--acc2); }
+@media (max-width: 1100px) { main { grid-template-columns: 1fr; height: auto; } section { border-right: 0; border-bottom: 1px solid var(--line); } }
+.quit { margin-top: 22px; width: 100%; color: var(--mut); font-size: 12px; }
+
+h2 .hint { text-transform: none; letter-spacing: 0; color: var(--mut); font-weight: 400; }
+.proj { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.presets button { font-size: 12px; padding: 6px 9px; }
+.pgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.proj fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 0; padding: 6px 10px 8px; min-width: 0; }
+.proj fieldset.off { opacity: .45; }
+.proj legend { color: var(--fg); font-size: 12px; font-weight: 650; padding: 0 4px; }
+.proj legend i { color: var(--mut); font-weight: 400; font-style: normal; margin-left: 4px; }
+.pctl label { display: flex; justify-content: space-between; color: var(--mut); font-size: 12px; margin-top: 4px; }
+.pctl output { color: var(--fg); font-family: ui-monospace, Consolas, monospace; }
+.pctl input { width: 100%; accent-color: var(--acc2); }
+.plink { display: flex; gap: 8px; align-items: center; color: var(--mut); font-size: 13px; margin: 10px 0 6px; }
+.psum { font-size: 13px; line-height: 1.55; color: #c6cad1; }
+.psum b { color: var(--acc); font-weight: 600; }
+.psum .bad { color: var(--bad); }
+@media (max-width: 1300px) { .pgrid { grid-template-columns: 1fr; } }
