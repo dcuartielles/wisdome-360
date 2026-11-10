@@ -10,6 +10,11 @@ Every change to this site is listed here, newest first, grouped by release. If s
 
 Changes since v0.0.2, *venue*. They are already on this site.
 
+### 2026-11-10
+
+- **New page: [Live slides from zero](make/live-slides-from-zero.md).** For anyone who has never used Node.js or a code editor: what Node.js is, installing it and VS Code on Windows, macOS or Linux, unzipping and starting the EX-13 kit, and a few small changes to a slide, step by step. Each step says how hard it usually is and how long it takes.
+- **EX-13 has a practice slide, *Start here*:** words, a picture, a dot that circles the room and a sound that follows it, all in plain JavaScript (no shader code), with every value at the top of the file. A slide with a mistake in it now says so in the dome, instead of staying black. Download the [kit](examples/files/EX-13-simple-hdmi-dante.zip) again to get it.
+
 ### 2026-11-09 (evening)
 
 - **The venue's HDMI test frame**, from the Wisdome technicians: 3840 × 2160 with the dome circle in the middle. Check your output against it before you come. See [Connecting a live piece](reference/connecting.md#the-venues-test-frame).

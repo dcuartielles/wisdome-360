@@ -90,6 +90,7 @@ nav:
       - make/index.md
       - Making a film: make/film.md
       - Making a live piece: make/live.md
+      - Live slides from zero: make/live-slides-from-zero.md
   - Examples:
       - examples/index.md
       - EX-01 Drift (Blender): examples/ex01-drift.md

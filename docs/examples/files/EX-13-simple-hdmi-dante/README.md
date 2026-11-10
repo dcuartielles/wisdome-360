@@ -1,12 +1,16 @@
 # EX-13 · Simple HDMI + Dante example
 
-A small version of the live dome slides used in the Wisdome lecture: the same engine, with **five
-demo slides**, one of each kind, with comments in the code so you can copy them and make your own.
+A small version of the live dome slides used in the Wisdome lecture: the same engine, with **a practice
+slide and five demo slides**, one of each kind, with comments in the code so you can copy them and make your own.
+
+**Never used Node.js or a code editor?** Follow [Live slides from zero](https://dcuartielles.github.io/wisdome-360/make/live-slides-from-zero/)
+first: it takes you from installing the tools to changing the practice slide, step by step.
 It sends the **picture over HDMI** and the **sound (5.1) over Dante**, the way a live piece reaches
 the Wisdome dome.
 
 | Slide | Folder | What it shows you |
 |---|---|---|
+| **Start here** | `slides/start-here/` | **the one to practise on**: words, a picture, a dot that circles the room and a sound that follows it, all in plain JavaScript (no shader code). Every value is at the top of the file |
 | Test image | `slides/00-test-card/` | where the front is, the screen edge, the sweet spot, the five speakers; a **Speaker ident** button |
 | Title screen | `slides/01-title/` | text placed by angle, a turning starry sky, an optional drone that circles the room |
 | Sound that moves | `slides/02-comet/` | a comet circling the room, its sound following it over the 5.1 speakers |
@@ -19,7 +23,7 @@ three.js (in `vendor/`) **MIT**.
 ## 1 · What you need
 
 - A laptop with **Node.js 20 or newer** ([nodejs.org](https://nodejs.org)) and **Google Chrome**. Windows, macOS or Linux.
-- For the sample media: Python 3 with `numpy` and `pillow`, and `ffmpeg`. Or download them (step 2).
+- Only for the two sample films (carousel video, dome film): Python 3 with `numpy` and `pillow`, and `ffmpeg`, or download them (step 2). Everything else, including the practice slide, works without them.
 - In the dome: an **HDMI** cable to the venue's input, an **Ethernet** cable to the Dante network, and
   **Dante Virtual Soundcard** (Audinate; a licence or its trial) on the laptop.
 
@@ -27,9 +31,10 @@ three.js (in `vendor/`) **MIT**.
 
 ```
 cd EX-13-simple-hdmi-dante
-python3 tools/make_sample_media.py      # once: makes the sample pictures and films (or unzip
-                                        # EX-13-sample-media.zip from the Releases page here)
 node server/server.mjs
+
+# optional, once: the two sample films (or unzip EX-13-sample-media.zip from the Releases page)
+python3 tools/make_sample_media.py
 ```
 
 On Windows you can double-click `setup/Dome Slides.cmd` instead (macOS: `setup/Dome Slides.command`).
@@ -48,7 +53,8 @@ All pages follow the same shared state: press Next on the presenter and every pa
 
 1. Open the **rehearsal** address. Click once to start the sound. **Drag** to look around as if you sat in
    the dome; the wheel zooms. You hear a stereo mix of the 5.1 sound.
-2. Open the **presenter** in a second window and step through the five slides with **→**.
+2. Open the **presenter** in a second window and step through the slides with **→**.
+   - On **Start here**, open `slides/start-here/slide.js`, change the words, save, and reload the rehearsal tab.
    - On the test image, press **Speaker ident**: the noise moves L, C, R, Rs, Ls, LFE and the rings light up.
    - On the comet, change the speed and height and follow the sound with your eyes closed.
    - On the carousel, press **↓** to bring the next picture to the front; turn on the 🔊 switch of the video.
@@ -126,12 +132,28 @@ flashes don't line up, use the presenter's **Audio delay** to delay the sound.
 
 ## 7 · Make your own slide
 
-1. Copy the demo folder closest to what you want (e.g. `slides/02-comet/` → `slides/05-my-scene/`).
+1. Copy the demo folder closest to what you want (e.g. `slides/start-here/` → `slides/05-my-scene/`).
+   `start-here` is the easiest: plain JavaScript, no shader. The others draw their picture in GLSL.
 2. Add `'05-my-scene'` to the list in `slides/index.js`, where it should appear.
 3. Edit `slide.js`. Reload the picture, sound and presenter pages (they read the slides once, when they open).
 4. If something goes wrong, the slide shows "failed to load": press **F12** in Chrome and read the Console.
 
 ### Cheat sheet
+
+For slides made from `start-here` (the template in `slides/_simple.js`):
+
+| In the slide | What it is |
+|---|---|
+| `still(draw, dome)` | drawn once: words, boxes, pictures that don't move |
+| `moving(draw, t, dome)` | drawn every frame; `t` = seconds since the slide started |
+| `draw.text(words, az, el, { size, color, weight })` | words centred on (az, el); `size` = letter height in degrees |
+| `draw.circle(az, el, size, { color, glow })` | a round spot, `size` = diameter in degrees |
+| `draw.box(az, el, width, height, { color, fill })` | a rectangle, sizes in degrees |
+| `draw.picture(file, az, el, width)` | a picture from the slide's `media/` folder |
+| `sound: { file, volume, note, at }` | one looping sound (or a tone of `note` Hz); `at(t)` returns `{ az, el }`, where it comes from |
+| `dome.sweetSpot` | the best elevation, straight ahead (about 20°) |
+
+For the other demo slides:
 
 | In the slide | What it is |
 |---|---|

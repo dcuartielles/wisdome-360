@@ -12,3 +12,6 @@ Thumbs.db
 # Coordination and local settings
 .publish-queue.md
 .claude/
+
+# written by the EX-13 kit each time its server starts
+docs/examples/files/*/server/last-run.log
